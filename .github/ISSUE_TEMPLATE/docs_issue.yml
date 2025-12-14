@@ -1,0 +1,46 @@
+name: Documentation Issue
+description: Report an issue with the documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Found an issue with the documentation? Let us know!
+
+  - type: input
+    id: page
+    attributes:
+      label: Documentation Page
+      description: URL or path to the documentation page
+      placeholder: https://muhammad-fiaz.github.io/api.zig/...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Issue Type
+      options:
+        - Incorrect information
+        - Missing information
+        - Unclear explanation
+        - Broken link
+        - Typo
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: What's wrong with the documentation?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Fix
+      description: How should the documentation be improved?

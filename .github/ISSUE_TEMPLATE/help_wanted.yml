@@ -1,0 +1,46 @@
+name: Help Wanted
+description: Ask for help with using api.zig
+title: "[Help]: "
+labels: ["help wanted", "question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help with api.zig? We're here to assist!
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do you need help with?
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What I've Tried
+      description: What have you already tried?
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Code
+      description: Relevant code (if any)
+      render: zig
+
+  - type: input
+    id: zig-version
+    attributes:
+      label: Zig Version
+      placeholder: "0.15.0"
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have read the documentation
+          required: true
+        - label: I have searched existing issues
+          required: true

@@ -1,0 +1,15 @@
+.{
+    .name = .api,
+    .version = "0.0.1",
+    .dependencies = .{},
+    .fingerprint = 0xad05d80fc382d16c,
+    .minimum_zig_version = "0.15.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "examples",
+        "README.md",
+        "LICENSE",
+    },
+}
