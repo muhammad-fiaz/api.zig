@@ -171,3 +171,53 @@ api.zig uses `{}` syntax for parameters:
 | `/users/{id}`             | `/users/123`       | ✅ id="123"        |
 | `/users/{id}`             | `/users/`          | ❌                 |
 | `/users/{id}/posts/{pid}` | `/users/1/posts/5` | ✅ id="1", pid="5" |
+
+## Context Methods
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `ctx.param("name")` | `?[]const u8` | Get path parameter |
+| `ctx.query("key")` | `?[]const u8` | Get query parameter |
+| `ctx.header("name")` | `?[]const u8` | Get request header |
+| `ctx.body()` | `?[]const u8` | Get request body |
+| `ctx.json(T)` | `!T` | Parse JSON body to struct |
+| `ctx.method()` | `Method` | Get HTTP method |
+| `ctx.path()` | `[]const u8` | Get request path |
+
+## Error Handling
+
+```zig
+fn getUser(ctx: *api.Context) api.Response {
+    const id_str = ctx.param("id") orelse {
+        return api.Response.jsonRaw(
+            \\{"error":"Missing user ID"}
+        ).setStatus(.bad_request);
+    };
+
+    const id = std.fmt.parseInt(u32, id_str, 10) catch {
+        return api.Response.jsonRaw(
+            \\{"error":"Invalid user ID format"}
+        ).setStatus(.bad_request);
+    };
+
+    // Continue with valid id...
+    _ = id;
+    return api.Response.jsonRaw(\\{"id":1});
+}
+```
+
+## HTTP Status Codes
+
+| Code | Constant | When to Use |
+|------|----------|-------------|
+| 200 | `.ok` | Resource found |
+| 400 | `.bad_request` | Invalid parameter format |
+| 404 | `.not_found` | Resource not found |
+| 422 | `.unprocessable_entity` | Validation failed |
+
+## Best Practices
+
+1. **Always handle missing parameters**: Use `orelse` to provide fallbacks
+2. **Validate parameter formats**: Parse strings to appropriate types
+3. **Return proper status codes**: Use 400 for invalid input, 404 for not found
+4. **Document your parameters**: OpenAPI will auto-generate documentation

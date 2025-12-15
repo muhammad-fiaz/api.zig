@@ -1,5 +1,4 @@
-//! JSON utilities.
-//! Parse, stringify, validate, and escape JSON data.
+//! JSON serialization and deserialization utilities with validation and escaping.
 
 const std = @import("std");
 

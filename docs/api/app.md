@@ -101,6 +101,30 @@ pub fn patch(self: *App, comptime path: []const u8, handler: anytype) !void
 
 Registers a PATCH route.
 
+### options
+
+```zig
+pub fn options(self: *App, comptime path: []const u8, handler: anytype) !void
+```
+
+Registers an OPTIONS route for CORS preflight handling.
+
+### head
+
+```zig
+pub fn head(self: *App, comptime path: []const u8, handler: anytype) !void
+```
+
+Registers a HEAD route (returns headers only, no body).
+
+### trace
+
+```zig
+pub fn trace(self: *App, comptime path: []const u8, handler: anytype) !void
+```
+
+Registers a TRACE route for debugging request paths.
+
 ### run
 
 ```zig

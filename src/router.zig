@@ -1,5 +1,5 @@
-//! Compile-time router.
-//! Route registration, path matching, and parameter extraction.
+//! Compile-time route registration and runtime request matching.
+//! Supports path parameters, sub-routers, and automatic OpenAPI metadata extraction.
 
 const std = @import("std");
 const http = @import("http.zig");
@@ -96,6 +96,35 @@ pub const Router = struct {
         r.tags = config.tags;
         r.deprecated = config.deprecated;
         return r;
+    }
+
+    /// Includes routes from another router with path prefix and optional tag overrides.
+    pub fn include_router(self: *Router, other: *const Router, prefix: []const u8, tags: []const []const u8) !void {
+        for (other.routes.items) |r| {
+            const prefixed_path = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ prefix, r.path });
+            const merged_tags = if (tags.len > 0) tags else r.tags;
+
+            const new_route = Route{
+                .method = r.method,
+                .path = prefixed_path,
+                .handler = r.handler,
+                .segment_count = r.segment_count + countRuntimeSegments(prefix),
+                .summary = r.summary,
+                .description = r.description,
+                .tags = merged_tags,
+                .deprecated = r.deprecated,
+            };
+            try self.routes.append(self.allocator, new_route);
+        }
+    }
+
+    fn countRuntimeSegments(path: []const u8) usize {
+        if (path.len == 0) return 0;
+        var count: usize = 0;
+        for (path) |c| {
+            if (c == '/') count += 1;
+        }
+        return if (path[path.len - 1] != '/') count else count;
     }
 
     /// Initialize a new router.

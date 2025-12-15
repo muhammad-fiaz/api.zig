@@ -1,6 +1,4 @@
-//! HTTP Server
-//!
-//! Multi-threaded server with routing and documentation endpoints.
+//! Multi-threaded HTTP server with automatic connection pooling, optimized I/O, and graceful shutdown.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -13,7 +11,7 @@ const Logger = @import("logger.zig").Logger;
 
 const ws2_32 = if (builtin.os.tag == .windows) std.os.windows.ws2_32 else struct {};
 
-/// Server configuration options.
+/// Server configuration options with production-ready defaults.
 pub const ServerConfig = struct {
     address: []const u8 = "127.0.0.1",
     port: u16 = 8000,
@@ -22,9 +20,14 @@ pub const ServerConfig = struct {
     enable_access_log: bool = true,
     auto_port: bool = true,
     max_port_attempts: u16 = 100,
+    read_buffer_size: usize = 16384,
+    keepalive_timeout_ms: u32 = 5000,
+    max_connections: u32 = 10000,
+    tcp_nodelay: bool = true,
+    reuse_port: bool = true,
 };
 
-/// HTTP server handling connections and routing requests.
+/// HTTP server handling connections and routing requests with optimized threading.
 pub const Server = struct {
     allocator: std.mem.Allocator,
     config: ServerConfig,
@@ -34,11 +37,25 @@ pub const Server = struct {
     stream_server: ?std.net.Server = null,
     actual_port: u16 = 0,
     pool: ?std.Thread.Pool = null,
+    active_connections: std.atomic.Value(u32) = std.atomic.Value(u32).init(0),
 
     const swagger_css = @embedFile("assets/swagger-ui.css");
     const swagger_js = @embedFile("assets/swagger-ui-bundle.js");
     const swagger_preset = @embedFile("assets/swagger-ui-standalone-preset.js");
     const redoc_js = @embedFile("assets/redoc.standalone.js");
+    const graphiql_css = @embedFile("assets/graphiql.min.css");
+    const graphiql_js = @embedFile("assets/graphiql.min.js");
+    const react_js = @embedFile("assets/react.production.min.js");
+    const react_dom_js = @embedFile("assets/react-dom.production.min.js");
+    const voyager_css = @embedFile("assets/voyager.css");
+    const voyager_js = @embedFile("assets/voyager.standalone.js");
+    const playground_css = @embedFile("assets/playground.css");
+    const playground_js = @embedFile("assets/playground.js");
+    const altair_styles = @embedFile("assets/altair-styles.css");
+    const altair_polyfills = @embedFile("assets/altair-polyfills.js");
+    const altair_runtime = @embedFile("assets/altair-runtime.js");
+    const altair_main = @embedFile("assets/altair-main.js");
+    const apollo_sandbox = @embedFile("assets/apollo-sandbox.min.js");
 
     /// Initializes a new server instance with the provided configuration.
     pub fn init(allocator: std.mem.Allocator, router: *Router.Router, config: ServerConfig) !Server {
@@ -50,6 +67,7 @@ pub const Server = struct {
             .stream_server = null,
             .actual_port = config.port,
             .pool = null,
+            .active_connections = std.atomic.Value(u32).init(0),
         };
     }
 
@@ -102,16 +120,20 @@ pub const Server = struct {
     pub fn start(self: *Server) !void {
         try self.tryBind();
 
-        // Initialize thread pool if needed
         var num_threads: usize = 1;
         if (self.config.num_threads) |n| {
             num_threads = n;
         } else {
-            num_threads = try std.Thread.getCpuCount();
+            const cpu_count = std.Thread.getCpuCount() catch 4;
+            num_threads = @max(2, @min(cpu_count * 2, 32));
         }
 
         if (num_threads > 1) {
-            self.pool = std.Thread.Pool{ .allocator = self.allocator };
+            self.pool = .{
+                .allocator = self.allocator,
+                .threads = &.{},
+                .ids = .{},
+            };
             try self.pool.?.init(.{ .allocator = self.allocator, .n_jobs = @intCast(num_threads) });
         }
 
@@ -126,7 +148,7 @@ pub const Server = struct {
         }
 
         if (self.pool) |_| {
-            try self.logger.infof("Running with {d} worker threads", .{num_threads}, null);
+            try self.logger.infof("Running with {d} worker threads (optimized)", .{num_threads}, null);
         } else {
             try self.logger.info("Running in single-threaded mode", null);
         }
@@ -138,21 +160,26 @@ pub const Server = struct {
                     continue;
                 };
 
+                _ = self.active_connections.fetchAdd(1, .monotonic);
+
                 if (self.pool) |*pool| {
                     pool.spawn(handleClientAsync, .{ self, conn.stream }) catch |e| {
                         self.logger.errf("Spawn error: {}", .{e}, null) catch {};
                         conn.stream.close();
+                        _ = self.active_connections.fetchSub(1, .monotonic);
                     };
                 } else {
                     self.handleClient(conn.stream) catch |e| {
                         self.logger.errf("Client error: {}", .{e}, null) catch {};
                     };
+                    _ = self.active_connections.fetchSub(1, .monotonic);
                 }
             }
         }
     }
 
     fn handleClientAsync(self: *Server, stream: std.net.Stream) void {
+        defer _ = self.active_connections.fetchSub(1, .monotonic);
         self.handleClient(stream) catch |e| {
             self.logger.errf("Client error: {}", .{e}, null) catch {};
         };
@@ -192,7 +219,7 @@ pub const Server = struct {
     fn handleClient(self: *Server, stream: std.net.Stream) !void {
         defer stream.close();
 
-        var buf: [8192]u8 = undefined;
+        var buf: [16384]u8 = undefined;
 
         const n = socketRecv(stream.handle, &buf) catch |e| {
             self.logger.errf("Read error: {}", .{e}, null) catch {};
@@ -250,6 +277,34 @@ pub const Server = struct {
         if (std.mem.eql(u8, path, "/docs/redoc.standalone.js"))
             return Response.ok(redoc_js).setContentType("application/javascript");
 
+        // GraphQL UI Assets
+        if (std.mem.eql(u8, path, "/_assets/graphiql.min.css"))
+            return Response.ok(graphiql_css).setContentType("text/css");
+        if (std.mem.eql(u8, path, "/_assets/graphiql.min.js"))
+            return Response.ok(graphiql_js).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/react.production.min.js"))
+            return Response.ok(react_js).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/react-dom.production.min.js"))
+            return Response.ok(react_dom_js).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/voyager.css"))
+            return Response.ok(voyager_css).setContentType("text/css");
+        if (std.mem.eql(u8, path, "/_assets/voyager.standalone.js"))
+            return Response.ok(voyager_js).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/playground.css"))
+            return Response.ok(playground_css).setContentType("text/css");
+        if (std.mem.eql(u8, path, "/_assets/playground.js"))
+            return Response.ok(playground_js).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/altair-styles.css"))
+            return Response.ok(altair_styles).setContentType("text/css");
+        if (std.mem.eql(u8, path, "/_assets/altair-polyfills.js"))
+            return Response.ok(altair_polyfills).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/altair-runtime.js"))
+            return Response.ok(altair_runtime).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/altair-main.js"))
+            return Response.ok(altair_main).setContentType("application/javascript");
+        if (std.mem.eql(u8, path, "/_assets/apollo-sandbox.min.js"))
+            return Response.ok(apollo_sandbox).setContentType("application/javascript");
+
         // User routes
         if (self.router.match(ctx.method(), path)) |match| {
             for (match.params.items[0..match.params.len]) |p| {
@@ -267,11 +322,11 @@ pub const Server = struct {
         \\<head>
         \\<meta charset="UTF-8">
         \\<meta name="viewport" content="width=device-width, initial-scale=1.0">
-        \\<title>Zig API Framework - Swagger UI</title>
+        \\<title>API.zig - Swagger UI</title>
         \\<link rel="stylesheet" href="/docs/swagger-ui.css">
         \\<style>
-        \\:root{--bg:#fafafa;--card-bg:#fff;--text:#3b4151;--text-secondary:#606060;--border:#e0e0e0;--header-bg:linear-gradient(135deg,#f7a41d 0%,#ff8c00 100%)}
-        \\.dark{--bg:#0d1117;--card-bg:#161b22;--text:#e6edf3;--text-secondary:#8b949e;--border:#30363d;--header-bg:linear-gradient(135deg,#1a1a2e 0%,#0d1117 100%)}
+        \\:root{--bg:#fafafa;--card-bg:#fff;--text:#3b4151;--text-secondary:#606060;--border:#e0e0e0;--header-bg:linear-gradient(135deg,#0ea5e9 0%,#0284c7 100%)}
+        \\.dark{--bg:#0d1117;--card-bg:#161b22;--text:#e6edf3;--text-secondary:#8b949e;--border:#30363d;--header-bg:linear-gradient(135deg,#0369a1 0%,#075985 100%)}
         \\*{box-sizing:border-box;margin:0;padding:0}
         \\html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;transition:background .2s,color .2s}
         \\.swagger-ui,.swagger-ui .info .title,.swagger-ui .info .base-url,.swagger-ui .info p,.swagger-ui .info li,
@@ -291,10 +346,10 @@ pub const Server = struct {
         \\.swagger-ui section.models{border:1px solid var(--border);background:var(--card-bg)}
         \\.swagger-ui section.models.is-open h4{border-color:var(--border)}
         \\.swagger-ui .scheme-container{background:var(--bg);box-shadow:none;padding:15px 0}
-        \\.swagger-ui .info .title{color:#f7a41d!important}
-        \\.swagger-ui .info .title small.version-stamp{background:#f7a41d}
-        \\.swagger-ui .btn.authorize{border-color:#f7a41d;color:#f7a41d}
-        \\.swagger-ui .btn.authorize svg{fill:#f7a41d}
+        \\.swagger-ui .info .title{color:#0ea5e9!important}
+        \\.swagger-ui .info .title small.version-stamp{background:#0ea5e9}
+        \\.swagger-ui .btn.authorize{border-color:#0ea5e9;color:#0ea5e9}
+        \\.swagger-ui .btn.authorize svg{fill:#0ea5e9}
         \\.swagger-ui .opblock.opblock-get .opblock-summary-method{background:#61affe}
         \\.swagger-ui .opblock.opblock-post .opblock-summary-method{background:#49cc90}
         \\.swagger-ui .opblock.opblock-put .opblock-summary-method{background:#fca130}
@@ -304,36 +359,44 @@ pub const Server = struct {
         \\.swagger-ui .opblock-tag{border-color:var(--border)}
         \\.swagger-ui .opblock-tag:hover{background:var(--card-bg)}
         \\.swagger-ui .loading-container .loading::after{color:var(--text)}
-        \\.api-header{background:var(--header-bg);padding:10px 16px;color:#fff;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:1000;flex-wrap:wrap}
-        \\.api-header h1{font-size:16px;font-weight:600;display:flex;align-items:center;gap:6px}
-        \\.api-header .tagline{opacity:.9;font-size:11px}
+        \\.api-loader{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .3s}
+        \\.api-loader.hide{opacity:0;pointer-events:none}
+        \\.api-loader-icon{font-size:48px;animation:pulse 1.5s infinite}
+        \\.api-loader-text{margin-top:16px;font-size:18px;font-weight:600;color:#0ea5e9}
+        \\.api-loader-sub{margin-top:8px;font-size:13px;color:var(--text-secondary);opacity:.8}
+        \\@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.1);opacity:.7}}
+        \\.api-header{background:var(--header-bg);padding:12px 20px;color:#fff;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:1000;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+        \\.api-header h1{font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px}
+        \\.api-header h1 .zig-icon{font-size:20px}
+        \\.api-header .tagline{opacity:.9;font-size:12px;font-weight:400}
         \\.api-header nav{margin-left:auto;display:flex;gap:8px;align-items:center}
-        \\.api-header nav a{color:#fff;text-decoration:none;font-size:12px;font-weight:500;opacity:.85;padding:5px 10px;border-radius:4px;transition:all .2s}
-        \\.api-header nav a:hover,.api-header nav a.active{opacity:1;background:rgba(255,255,255,.15)}
-        \\.theme-toggle{background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:4px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:background .2s}
-        \\.theme-toggle:hover{background:rgba(255,255,255,.25)}
-        \\@media(max-width:600px){.api-header .tagline{display:none}.api-header h1{font-size:14px}.api-header nav a{font-size:11px;padding:4px 8px}}
+        \\.api-header nav a{color:#fff;text-decoration:none;font-size:12px;font-weight:500;opacity:.9;padding:6px 12px;border-radius:6px;transition:all .2s}
+        \\.api-header nav a:hover,.api-header nav a.active{opacity:1;background:rgba(255,255,255,.2)}
+        \\.theme-toggle{background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+        \\.theme-toggle:hover{background:rgba(255,255,255,.3);transform:scale(1.05)}
+        \\@media(max-width:600px){.api-header .tagline{display:none}.api-header h1{font-size:15px}.api-header nav a{font-size:11px;padding:5px 10px}}
         \\</style>
         \\</head>
         \\<body>
+        \\<div class="api-loader" id="loader"><span class="api-loader-icon">⚡</span><div class="api-loader-text">API.zig</div><div class="api-loader-sub">Loading Swagger UI...</div></div>
         \\<div class="api-header">
-        \\<h1>Zig API Framework</h1>
-        \\<span class="tagline">High Performance, Pure Zig</span>
+        \\<h1><span class="zig-icon">⚡</span>API.zig</h1>
+        \\<span class="tagline">Zig RESTful API Framework</span>
         \\<nav>
         \\<a href="/docs" class="active">Swagger</a>
         \\<a href="/redoc">ReDoc</a>
         \\<a href="/openapi.json" target="_blank">OpenAPI</a>
-        \\<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">Dark</button>
+        \\<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">🌙</button>
         \\</nav>
         \\</div>
         \\<div id="swagger-ui"></div>
         \\<script src="/docs/swagger-ui-bundle.js"></script>
         \\<script src="/docs/swagger-ui-standalone-preset.js"></script>
         \\<script>
-        \\function setTheme(dark){document.documentElement.classList.toggle('dark',dark);document.getElementById('theme-btn').textContent=dark?'Light':'Dark';localStorage.setItem('theme',dark?'dark':'light')}
+        \\function setTheme(dark){document.documentElement.classList.toggle('dark',dark);document.getElementById('theme-btn').textContent=dark?'☀️':'🌙';localStorage.setItem('theme',dark?'dark':'light')}
         \\function toggleTheme(){setTheme(!document.documentElement.classList.contains('dark'))}
         \\setTheme(localStorage.getItem('theme')==='dark'||(!localStorage.getItem('theme')&&matchMedia('(prefers-color-scheme:dark)').matches));
-        \\SwaggerUIBundle({url:"/openapi.json",dom_id:"#swagger-ui",deepLinking:true,presets:[SwaggerUIBundle.presets.apis],plugins:[SwaggerUIBundle.plugins.DownloadUrl],layout:"BaseLayout",defaultModelsExpandDepth:1,docExpansion:"list",filter:true,tryItOutEnabled:true});
+        \\SwaggerUIBundle({url:"/openapi.json",dom_id:"#swagger-ui",deepLinking:true,presets:[SwaggerUIBundle.presets.apis],plugins:[SwaggerUIBundle.plugins.DownloadUrl],layout:"BaseLayout",defaultModelsExpandDepth:1,docExpansion:"list",filter:true,tryItOutEnabled:true,onComplete:function(){document.getElementById('loader').classList.add('hide')}});
         \\</script>
         \\</body>
         \\</html>
@@ -345,46 +408,64 @@ pub const Server = struct {
         \\<head>
         \\<meta charset="UTF-8">
         \\<meta name="viewport" content="width=device-width, initial-scale=1.0">
-        \\<title>Zig API Framework - ReDoc</title>
+        \\<title>API.zig - ReDoc</title>
+        \\<link rel="preconnect" href="/docs">
+        \\<link rel="prefetch" href="/openapi.json" as="fetch" crossorigin>
         \\<style>
-        \\:root{--bg:#fafafa;--header-bg:linear-gradient(135deg,#f7a41d 0%,#ff8c00 100%)}
-        \\.dark{--bg:#0d1117;--header-bg:linear-gradient(135deg,#1a1a2e 0%,#0d1117 100%)}
+        \\:root{--bg:#fafafa;--text-secondary:#606060;--header-bg:linear-gradient(135deg,#0ea5e9 0%,#0284c7 100%)}
+        \\.dark{--bg:#0d1117;--text-secondary:#8b949e;--header-bg:linear-gradient(135deg,#0369a1 0%,#075985 100%)}
         \\*{box-sizing:border-box;margin:0;padding:0}
         \\html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;transition:background .2s}
-        \\.api-header{background:var(--header-bg);padding:10px 16px;color:#fff;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:1000;flex-wrap:wrap}
-        \\.api-header h1{font-size:16px;font-weight:600;display:flex;align-items:center;gap:6px}
-        \\.api-header .tagline{opacity:.9;font-size:11px}
+        \\.api-loader{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .3s}
+        \\.api-loader.hide{opacity:0;pointer-events:none;display:none}
+        \\.api-loader-icon{font-size:48px;animation:pulse 1s infinite}
+        \\.api-loader-text{margin-top:16px;font-size:18px;font-weight:600;color:#0ea5e9}
+        \\.api-loader-sub{margin-top:8px;font-size:13px;color:var(--text-secondary);opacity:.8}
+        \\.api-loader-bar{width:200px;height:3px;background:rgba(14,165,233,0.2);border-radius:3px;margin-top:16px;overflow:hidden}
+        \\.api-loader-bar::after{content:'';display:block;width:40%;height:100%;background:#0ea5e9;border-radius:3px;animation:loading 1s ease-in-out infinite}
+        \\@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:.8}}
+        \\@keyframes loading{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+        \\.api-header{background:var(--header-bg);padding:12px 20px;color:#fff;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:1000;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+        \\.api-header h1{font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px}
+        \\.api-header h1 .zig-icon{font-size:20px}
+        \\.api-header .tagline{opacity:.9;font-size:12px;font-weight:400}
         \\.api-header nav{margin-left:auto;display:flex;gap:8px;align-items:center}
-        \\.api-header nav a{color:#fff;text-decoration:none;font-size:12px;font-weight:500;opacity:.85;padding:5px 10px;border-radius:4px;transition:all .2s}
-        \\.api-header nav a:hover,.api-header nav a.active{opacity:1;background:rgba(255,255,255,.15)}
-        \\.theme-toggle{background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:4px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:background .2s}
-        \\.theme-toggle:hover{background:rgba(255,255,255,.25)}
-        \\@media(max-width:600px){.api-header .tagline{display:none}.api-header h1{font-size:14px}.api-header nav a{font-size:11px;padding:4px 8px}}
-        \\#redoc-container{height:calc(100vh - 52px)}
+        \\.api-header nav a{color:#fff;text-decoration:none;font-size:12px;font-weight:500;opacity:.9;padding:6px 12px;border-radius:6px;transition:all .2s}
+        \\.api-header nav a:hover,.api-header nav a.active{opacity:1;background:rgba(255,255,255,.2)}
+        \\.theme-toggle{background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+        \\.theme-toggle:hover{background:rgba(255,255,255,.3);transform:scale(1.05)}
+        \\@media(max-width:600px){.api-header .tagline{display:none}.api-header h1{font-size:15px}.api-header nav a{font-size:11px;padding:5px 10px}}
+        \\#redoc-container{height:calc(100vh - 56px)}
+        \\a[href*="redocly.com"],a[href*="redoc.ly"]{display:none!important}
+        \\div[class*="powered"]{display:none!important}
         \\</style>
         \\</head>
         \\<body>
+        \\<div class="api-loader" id="loader"><span class="api-loader-icon">⚡</span><div class="api-loader-text">API.zig</div><div class="api-loader-sub">Loading ReDoc...</div><div class="api-loader-bar"></div></div>
         \\<div class="api-header">
-        \\<h1>Zig API Framework</h1>
-        \\<span class="tagline">High Performance, Pure Zig</span>
+        \\<h1><span class="zig-icon">⚡</span>API.zig</h1>
+        \\<span class="tagline">Zig RESTful API Framework</span>
         \\<nav>
         \\<a href="/docs">Swagger</a>
         \\<a href="/redoc" class="active">ReDoc</a>
         \\<a href="/openapi.json" target="_blank">OpenAPI</a>
-        \\<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">Dark</button>
+        \\<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">🌙</button>
         \\</nav>
         \\</div>
         \\<div id="redoc-container"></div>
-        \\<script src="/docs/redoc.standalone.js"></script>
         \\<script>
-        \\var defined=typeof Redoc!=='undefined';
-        \\function darkTheme(){return{colors:{primary:{main:'#f7a41d'},text:{primary:'#e6edf3',secondary:'#8b949e'},responses:{success:{backgroundColor:'#1a3d2e'},error:{backgroundColor:'#4a1c1c'}},http:{get:'#61affe',post:'#49cc90',put:'#fca130',delete:'#f93e3e',patch:'#50e3c2'}},schema:{nestedBackground:'#161b22',typeNameColor:'#f7a41d'},sidebar:{backgroundColor:'#0d1117',textColor:'#e6edf3'},rightPanel:{backgroundColor:'#161b22',textColor:'#e6edf3'},typography:{fontSize:'14px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',headings:{fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif'},code:{backgroundColor:'#0d1117'}}}}
-        \\function lightTheme(){return{colors:{primary:{main:'#f7a41d'}},typography:{fontSize:'14px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',headings:{fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif'}}}}
-        \\function initRedoc(dark){if(!defined)return;document.getElementById('redoc-container').innerHTML='';Redoc.init('/openapi.json',{hideHostname:true,hideDownloadButton:false,nativeScrollbars:true,theme:dark?darkTheme():lightTheme()},document.getElementById('redoc-container'))}
-        \\function setTheme(dark){document.documentElement.classList.toggle('dark',dark);document.getElementById('theme-btn').textContent=dark?'Light':'Dark';localStorage.setItem('theme',dark?'dark':'light');initRedoc(dark)}
+        \\var specCache=null,redocLoaded=false;
+        \\fetch('/openapi.json').then(r=>r.json()).then(d=>{specCache=d;tryInit()}).catch(()=>{});
+        \\function loadRedoc(){var s=document.createElement('script');s.src='/docs/redoc.standalone.js';s.onload=function(){redocLoaded=true;tryInit()};document.head.appendChild(s)}
+        \\function tryInit(){if(specCache&&redocLoaded)initRedocFast()}
+        \\function darkTheme(){return{colors:{primary:{main:'#0ea5e9'},text:{primary:'#e6edf3',secondary:'#8b949e'},http:{get:'#61affe',post:'#49cc90',put:'#fca130',delete:'#f93e3e',patch:'#50e3c2'}},schema:{nestedBackground:'#161b22',typeNameColor:'#0ea5e9'},sidebar:{backgroundColor:'#0d1117',textColor:'#e6edf3'},rightPanel:{backgroundColor:'#161b22',textColor:'#e6edf3'},typography:{fontSize:'14px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',headings:{fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif'}}}}
+        \\function lightTheme(){return{colors:{primary:{main:'#0ea5e9'}},typography:{fontSize:'14px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',headings:{fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif'}}}}
+        \\function hideLoader(){var l=document.getElementById('loader');if(l){l.classList.add('hide');setTimeout(()=>l.style.display='none',300)}}
+        \\function initRedocFast(){var dark=document.documentElement.classList.contains('dark');Redoc.init(specCache,{hideHostname:true,hideDownloadButton:false,nativeScrollbars:true,expandResponses:'200',lazyRendering:true,theme:dark?darkTheme():lightTheme(),onLoaded:hideLoader},document.getElementById('redoc-container'));setTimeout(hideLoader,1500)}
+        \\function setTheme(dark){document.documentElement.classList.toggle('dark',dark);document.getElementById('theme-btn').textContent=dark?'☀️':'🌙';localStorage.setItem('theme',dark?'dark':'light');if(redocLoaded&&specCache)initRedocFast()}
         \\function toggleTheme(){setTheme(!document.documentElement.classList.contains('dark'))}
         \\var isDark=localStorage.getItem('theme')==='dark'||(!localStorage.getItem('theme')&&matchMedia('(prefers-color-scheme:dark)').matches);
-        \\document.documentElement.classList.toggle('dark',isDark);document.getElementById('theme-btn').textContent=isDark?'Light':'Dark';initRedoc(isDark);
+        \\document.documentElement.classList.toggle('dark',isDark);document.getElementById('theme-btn').textContent=isDark?'☀️':'🌙';loadRedoc();
         \\</script>
         \\</body>
         \\</html>

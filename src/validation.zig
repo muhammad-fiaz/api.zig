@@ -1,9 +1,8 @@
-//! Input validation.
-//! Chainable rules for strings, numbers, emails, URLs.
+//! Production-grade input validation with chainable rules and detailed error reporting.
 
 const std = @import("std");
 
-/// Validation error details.
+/// Validation error details with field, message, and error code.
 pub const ValidationError = struct {
     field: []const u8,
     message: []const u8,
@@ -18,6 +17,12 @@ pub const ValidationError = struct {
         pattern,
         email,
         url,
+        uuid,
+        alpha,
+        alphanumeric,
+        numeric,
+        in_range,
+        one_of,
         custom,
     };
 };
@@ -31,6 +36,18 @@ pub const ValidationResult = struct {
     pub fn deinit(self: *ValidationResult) void {
         self.allocator.free(self.errors);
     }
+
+    pub fn firstError(self: ValidationResult) ?ValidationError {
+        if (self.errors.len > 0) return self.errors[0];
+        return null;
+    }
+
+    pub fn hasFieldError(self: ValidationResult, field: []const u8) bool {
+        for (self.errors) |err| {
+            if (std.mem.eql(u8, err.field, field)) return true;
+        }
+        return false;
+    }
 };
 
 const RuleType = enum {
@@ -41,6 +58,7 @@ const RuleType = enum {
     max_value,
     email,
     url,
+    uuid,
 };
 
 const Rule = struct {
@@ -146,6 +164,13 @@ pub fn Validator(comptime T: type) type {
                         }
                     }
                 },
+                .uuid => {
+                    if (@typeInfo(Type) == .pointer) {
+                        if (!isUuid(value)) {
+                            self.addError(rule.field, "Invalid UUID format", .custom);
+                        }
+                    }
+                },
             }
         }
 
@@ -212,11 +237,19 @@ pub fn Validator(comptime T: type) type {
             self.rules.append(self.allocator, .{ .field = field, .type = .url }) catch {};
             return self;
         }
+
+        /// Adds a UUID format validation.
+        pub fn uuid(self: *Self, field: []const u8) *Self {
+            self.rules.append(self.allocator, .{ .field = field, .type = .uuid }) catch {};
+            return self;
+        }
     };
 }
 
-/// Validates an email address format.
+/// Validates an email address format (RFC 5322 basic).
 pub fn isEmail(email_str: []const u8) bool {
+    if (email_str.len < 3 or email_str.len > 254) return false;
+
     var at_count: usize = 0;
     var at_pos: usize = 0;
 
@@ -228,44 +261,250 @@ pub fn isEmail(email_str: []const u8) bool {
     }
 
     if (at_count != 1) return false;
-    if (at_pos == 0 or at_pos == email_str.len - 1) return false;
+    if (at_pos == 0 or at_pos >= email_str.len - 1) return false;
 
+    const local = email_str[0..at_pos];
     const domain = email_str[at_pos + 1 ..];
+
+    if (local.len == 0 or local.len > 64) return false;
+    if (domain.len == 0 or domain.len > 253) return false;
+
     var dot_found = false;
+    var last_was_dot = true;
     for (domain) |c| {
-        if (c == '.') dot_found = true;
+        if (c == '.') {
+            if (last_was_dot) return false;
+            dot_found = true;
+            last_was_dot = true;
+        } else {
+            last_was_dot = false;
+        }
     }
 
-    return dot_found;
+    return dot_found and !last_was_dot;
 }
 
-/// Validates a URL format.
+/// Validates a URL format (HTTP/HTTPS).
 pub fn isUrl(url_str: []const u8) bool {
-    return std.mem.startsWith(u8, url_str, "http://") or
-        std.mem.startsWith(u8, url_str, "https://");
+    if (!std.mem.startsWith(u8, url_str, "http://") and !std.mem.startsWith(u8, url_str, "https://")) {
+        return false;
+    }
+    const after_scheme = if (std.mem.startsWith(u8, url_str, "https://"))
+        url_str[8..]
+    else
+        url_str[7..];
+
+    if (after_scheme.len == 0) return false;
+
+    for (after_scheme) |c| {
+        if (c == ' ' or c == '<' or c == '>') return false;
+    }
+
+    return true;
 }
 
-/// Validates that a string is not empty.
+/// Validates a UUID string (RFC 4122 v1-v5).
+pub fn isUuid(uuid_str: []const u8) bool {
+    if (uuid_str.len != 36) return false;
+    for (uuid_str, 0..) |c, i| {
+        if (i == 8 or i == 13 or i == 18 or i == 23) {
+            if (c != '-') return false;
+        } else {
+            if (!std.ascii.isHex(c)) return false;
+        }
+    }
+    return true;
+}
+
+/// Validates that a string is not empty or whitespace-only.
 pub fn isNotEmpty(str: []const u8) bool {
     return str.len > 0 and !std.mem.eql(u8, std.mem.trim(u8, str, " \t\n\r"), "");
 }
 
-/// Validates string length.
+/// Validates string length within bounds.
 pub fn isLengthBetween(str: []const u8, min: usize, max: usize) bool {
     return str.len >= min and str.len <= max;
 }
 
+/// Validates alphabetic characters only.
+pub fn isAlpha(str: []const u8) bool {
+    if (str.len == 0) return false;
+    for (str) |c| {
+        if (!std.ascii.isAlphabetic(c)) return false;
+    }
+    return true;
+}
+
+/// Validates alphanumeric characters only.
+pub fn isAlphanumeric(str: []const u8) bool {
+    if (str.len == 0) return false;
+    for (str) |c| {
+        if (!std.ascii.isAlphanumeric(c)) return false;
+    }
+    return true;
+}
+
+/// Validates numeric string (digits only).
+pub fn isNumeric(str: []const u8) bool {
+    if (str.len == 0) return false;
+    for (str) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
+    return true;
+}
+
+/// Validates hexadecimal string.
+pub fn isHex(str: []const u8) bool {
+    if (str.len == 0) return false;
+    for (str) |c| {
+        if (!std.ascii.isHex(c)) return false;
+    }
+    return true;
+}
+
+/// Validates ISO 8601 date format (YYYY-MM-DD).
+pub fn isDate(str: []const u8) bool {
+    if (str.len != 10) return false;
+    if (str[4] != '-' or str[7] != '-') return false;
+
+    const year = std.fmt.parseInt(u16, str[0..4], 10) catch return false;
+    const month = std.fmt.parseInt(u8, str[5..7], 10) catch return false;
+    const day = std.fmt.parseInt(u8, str[8..10], 10) catch return false;
+
+    if (year < 1 or year > 9999) return false;
+    if (month < 1 or month > 12) return false;
+    if (day < 1 or day > 31) return false;
+
+    return true;
+}
+
+/// Validates IPv4 address format.
+pub fn isIpv4(str: []const u8) bool {
+    var octets: u8 = 0;
+    var current: u16 = 0;
+    var digits: u8 = 0;
+
+    for (str) |c| {
+        if (c == '.') {
+            if (digits == 0 or current > 255) return false;
+            octets += 1;
+            current = 0;
+            digits = 0;
+        } else if (std.ascii.isDigit(c)) {
+            current = current * 10 + (c - '0');
+            digits += 1;
+            if (digits > 3) return false;
+        } else {
+            return false;
+        }
+    }
+
+    return octets == 3 and digits > 0 and current <= 255;
+}
+
+/// Validates phone number format (basic international).
+pub fn isPhone(str: []const u8) bool {
+    if (str.len < 7 or str.len > 20) return false;
+
+    var digit_count: usize = 0;
+    for (str) |c| {
+        if (std.ascii.isDigit(c)) {
+            digit_count += 1;
+        } else if (c != '+' and c != '-' and c != ' ' and c != '(' and c != ')') {
+            return false;
+        }
+    }
+
+    return digit_count >= 7 and digit_count <= 15;
+}
+
+/// Validates credit card number using Luhn algorithm.
+pub fn isCreditCard(str: []const u8) bool {
+    if (str.len < 13 or str.len > 19) return false;
+
+    var sum: u32 = 0;
+    var alternate = false;
+
+    var i: usize = str.len;
+    while (i > 0) {
+        i -= 1;
+        const c = str[i];
+        if (!std.ascii.isDigit(c)) return false;
+
+        var n: u32 = c - '0';
+        if (alternate) {
+            n *= 2;
+            if (n > 9) n -= 9;
+        }
+        sum += n;
+        alternate = !alternate;
+    }
+
+    return sum % 10 == 0;
+}
+
+/// Validates string matches one of the allowed values.
+pub fn isOneOf(str: []const u8, allowed: []const []const u8) bool {
+    for (allowed) |a| {
+        if (std.mem.eql(u8, str, a)) return true;
+    }
+    return false;
+}
+
+/// Validates integer is in range.
+pub fn inRange(comptime T: type, value: T, min: T, max: T) bool {
+    return value >= min and value <= max;
+}
+
 test "email validation" {
     try std.testing.expect(isEmail("test@example.com"));
+    try std.testing.expect(isEmail("user.name@domain.co.uk"));
     try std.testing.expect(!isEmail("invalid"));
     try std.testing.expect(!isEmail("@example.com"));
     try std.testing.expect(!isEmail("test@"));
+    try std.testing.expect(!isEmail("test@.com"));
 }
 
 test "url validation" {
     try std.testing.expect(isUrl("https://example.com"));
-    try std.testing.expect(isUrl("http://localhost"));
+    try std.testing.expect(isUrl("http://localhost:8080/path"));
     try std.testing.expect(!isUrl("ftp://example.com"));
+    try std.testing.expect(!isUrl("https://"));
+}
+
+test "uuid validation" {
+    try std.testing.expect(isUuid("123e4567-e89b-12d3-a456-426614174000"));
+    try std.testing.expect(!isUuid("invalid-uuid"));
+    try std.testing.expect(!isUuid("123e4567-e89b-12d3-a456"));
+}
+
+test "alpha validation" {
+    try std.testing.expect(isAlpha("Hello"));
+    try std.testing.expect(!isAlpha("Hello123"));
+    try std.testing.expect(!isAlpha(""));
+}
+
+test "alphanumeric validation" {
+    try std.testing.expect(isAlphanumeric("Hello123"));
+    try std.testing.expect(!isAlphanumeric("Hello 123"));
+}
+
+test "date validation" {
+    try std.testing.expect(isDate("2024-01-15"));
+    try std.testing.expect(!isDate("2024/01/15"));
+    try std.testing.expect(!isDate("01-15-2024"));
+}
+
+test "ipv4 validation" {
+    try std.testing.expect(isIpv4("192.168.1.1"));
+    try std.testing.expect(isIpv4("0.0.0.0"));
+    try std.testing.expect(!isIpv4("256.1.1.1"));
+    try std.testing.expect(!isIpv4("192.168.1"));
+}
+
+test "credit card validation" {
+    try std.testing.expect(isCreditCard("4111111111111111"));
+    try std.testing.expect(!isCreditCard("1234567890123456"));
 }
 
 test "not empty validation" {
@@ -294,7 +533,6 @@ test "Validator struct" {
         .minValue("age", 18)
         .email("email");
 
-    // Valid case
     {
         const data = TestStruct{
             .name = "John",
@@ -307,7 +545,6 @@ test "Validator struct" {
         try std.testing.expectEqual(@as(usize, 0), result.errors.len);
     }
 
-    // Invalid case
     {
         const data = TestStruct{
             .name = "Jo",

@@ -11,13 +11,32 @@ const Context = api.Context;
 
 ## Fields
 
-| Field       | Type            | Description                    |
-| ----------- | --------------- | ------------------------------ |
-| `request`   | `*Request`      | The HTTP request               |
-| `allocator` | `Allocator`     | Arena allocator (per-request)  |
-| `logger`    | `*Logger`       | Logger instance                |
-| `params`    | `StringHashMap` | Extracted path parameters      |
-| `state`     | `StringHashMap` | Request-scoped state storage   |
+| Field | Type | Description |
+|-------|------|-------------|
+| `request` | `*Request` | The HTTP request object |
+| `allocator` | `Allocator` | Arena allocator (per-request) |
+| `logger` | `*Logger` | Logger instance |
+| `params` | `StringHashMap` | Extracted path parameters |
+| `state` | `StringHashMap` | Request-scoped state storage |
+
+## Methods Summary
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `param(name)` | `?[]const u8` | Get path parameter |
+| `paramAs(T, name)` | `!T` | Get and parse path parameter |
+| `query(name)` | `?[]const u8` | Get query parameter |
+| `queryOr(name, default)` | `[]const u8` | Get query with default |
+| `queryAs(T, name)` | `!T` | Get and parse query parameter |
+| `queryAsOr(T, name, default)` | `T` | Get and parse with default |
+| `header(name)` | `?[]const u8` | Get request header |
+| `body()` | `?[]const u8` | Get request body |
+| `json(T)` | `!T` | Parse JSON body to struct |
+| `method()` | `Method` | Get HTTP method |
+| `path()` | `[]const u8` | Get request path |
+| `setHeader(name, value)` | `void` | Set response header |
+| `set(key, ptr)` | `void` | Store value in context |
+| `get(T, key)` | `?*T` | Retrieve stored value |
 
 ## Methods
 
@@ -134,6 +153,16 @@ pub fn get(self: *const Context, comptime T: type, key: []const u8) ?*T
 ```
 
 Retrieves a value from context state.
+
+### Background Tasks
+
+#### addBackgroundTask
+
+```zig
+pub fn addBackgroundTask(self: *Context, func: *const fn (*anyopaque) void, arg: *anyopaque) !void
+```
+
+Schedules a task to execute after the response is sent.
 
 ## Example
 

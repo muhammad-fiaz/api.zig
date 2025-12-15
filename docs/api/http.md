@@ -13,7 +13,19 @@ const StatusCode = api.StatusCode;
 
 ## Method
 
-HTTP request methods.
+HTTP request methods supported by api.zig:
+
+| Method | Constant | Description |
+|--------|----------|-------------|
+| GET | `.GET` | Retrieve resources |
+| POST | `.POST` | Create resources |
+| PUT | `.PUT` | Replace resources |
+| DELETE | `.DELETE` | Remove resources |
+| PATCH | `.PATCH` | Partial update |
+| HEAD | `.HEAD` | Headers only |
+| OPTIONS | `.OPTIONS` | CORS preflight |
+| TRACE | `.TRACE` | Debug/diagnostic |
+| CONNECT | `.CONNECT` | Tunnel connection |
 
 ```zig
 pub const Method = enum {
@@ -49,24 +61,55 @@ Returns the string representation.
 
 ## StatusCode
 
-HTTP status codes.
+HTTP status codes organized by category:
 
-```zig
-pub const StatusCode = enum(u16) {
-    @"continue" = 100,
-    ok = 200,
-    created = 201,
-    no_content = 204,
-    moved_permanently = 301,
-    found = 302,
-    bad_request = 400,
-    unauthorized = 401,
-    forbidden = 403,
-    not_found = 404,
-    internal_server_error = 500,
-    // ... more
-};
-```
+### Informational (1xx)
+
+| Code | Constant | Phrase |
+|------|----------|--------|
+| 100 | `.@"continue"` | Continue |
+| 101 | `.switching_protocols` | Switching Protocols |
+
+### Success (2xx)
+
+| Code | Constant | Phrase |
+|------|----------|--------|
+| 200 | `.ok` | OK |
+| 201 | `.created` | Created |
+| 202 | `.accepted` | Accepted |
+| 204 | `.no_content` | No Content |
+
+### Redirection (3xx)
+
+| Code | Constant | Phrase |
+|------|----------|--------|
+| 301 | `.moved_permanently` | Moved Permanently |
+| 302 | `.found` | Found |
+| 304 | `.not_modified` | Not Modified |
+| 307 | `.temporary_redirect` | Temporary Redirect |
+| 308 | `.permanent_redirect` | Permanent Redirect |
+
+### Client Error (4xx)
+
+| Code | Constant | Phrase |
+|------|----------|--------|
+| 400 | `.bad_request` | Bad Request |
+| 401 | `.unauthorized` | Unauthorized |
+| 403 | `.forbidden` | Forbidden |
+| 404 | `.not_found` | Not Found |
+| 405 | `.method_not_allowed` | Method Not Allowed |
+| 409 | `.conflict` | Conflict |
+| 422 | `.unprocessable_entity` | Unprocessable Entity |
+| 429 | `.too_many_requests` | Too Many Requests |
+
+### Server Error (5xx)
+
+| Code | Constant | Phrase |
+|------|----------|--------|
+| 500 | `.internal_server_error` | Internal Server Error |
+| 502 | `.bad_gateway` | Bad Gateway |
+| 503 | `.service_unavailable` | Service Unavailable |
+| 504 | `.gateway_timeout` | Gateway Timeout |
 
 ### Methods
 

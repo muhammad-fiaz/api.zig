@@ -1,9 +1,146 @@
-//! HTTP response builder.
-//! Fluent API for JSON, HTML, text, redirects, and custom headers.
+//! HTTP response builder with fluent API for JSON, HTML, text, redirects, cookies, and streaming.
 
 const std = @import("std");
 const http = @import("http.zig");
 const json_mod = @import("json.zig");
+
+/// RFC 6265 compliant cookie builder with all standard attributes.
+pub const Cookie = struct {
+    name: []const u8,
+    value: []const u8,
+    domain: ?[]const u8 = null,
+    path: ?[]const u8 = null,
+    max_age: ?i64 = null,
+    expires: ?[]const u8 = null,
+    secure: bool = false,
+    http_only: bool = false,
+    same_site: SameSite = .lax,
+    partitioned: bool = false,
+
+    pub const SameSite = enum {
+        strict,
+        lax,
+        none,
+
+        pub fn toString(self: SameSite) []const u8 {
+            return switch (self) {
+                .strict => "Strict",
+                .lax => "Lax",
+                .none => "None",
+            };
+        }
+    };
+
+    /// Creates a new cookie with name and value.
+    pub fn init(name: []const u8, value: []const u8) Cookie {
+        return .{ .name = name, .value = value };
+    }
+
+    /// Sets the cookie domain.
+    pub fn setDomain(self: Cookie, domain: []const u8) Cookie {
+        var c = self;
+        c.domain = domain;
+        return c;
+    }
+
+    /// Sets the cookie path.
+    pub fn setPath(self: Cookie, path: []const u8) Cookie {
+        var c = self;
+        c.path = path;
+        return c;
+    }
+
+    /// Sets the max-age in seconds.
+    pub fn setMaxAge(self: Cookie, seconds: i64) Cookie {
+        var c = self;
+        c.max_age = seconds;
+        return c;
+    }
+
+    /// Sets the expires date string (RFC 7231 format).
+    pub fn setExpires(self: Cookie, date: []const u8) Cookie {
+        var c = self;
+        c.expires = date;
+        return c;
+    }
+
+    /// Marks the cookie as secure (HTTPS only).
+    pub fn setSecure(self: Cookie, secure: bool) Cookie {
+        var c = self;
+        c.secure = secure;
+        return c;
+    }
+
+    /// Marks the cookie as HTTP-only (no JavaScript access).
+    pub fn setHttpOnly(self: Cookie, http_only: bool) Cookie {
+        var c = self;
+        c.http_only = http_only;
+        return c;
+    }
+
+    /// Sets the SameSite attribute.
+    pub fn setSameSite(self: Cookie, same_site: SameSite) Cookie {
+        var c = self;
+        c.same_site = same_site;
+        return c;
+    }
+
+    /// Marks the cookie as partitioned (CHIPS).
+    pub fn setPartitioned(self: Cookie, partitioned: bool) Cookie {
+        var c = self;
+        c.partitioned = partitioned;
+        return c;
+    }
+
+    /// Creates a session cookie (expires when browser closes).
+    pub fn session(name: []const u8, value: []const u8) Cookie {
+        return Cookie.init(name, value)
+            .setHttpOnly(true)
+            .setSameSite(.strict);
+    }
+
+    /// Creates a persistent cookie with max-age.
+    pub fn persistent(name: []const u8, value: []const u8, max_age_seconds: i64) Cookie {
+        return Cookie.init(name, value)
+            .setMaxAge(max_age_seconds)
+            .setHttpOnly(true);
+    }
+
+    /// Creates a secure authentication cookie.
+    pub fn auth(name: []const u8, token: []const u8) Cookie {
+        return Cookie.init(name, token)
+            .setHttpOnly(true)
+            .setSecure(true)
+            .setSameSite(.strict)
+            .setPath("/");
+    }
+
+    /// Creates a cookie that will be deleted.
+    pub fn delete(name: []const u8) Cookie {
+        return Cookie.init(name, "")
+            .setMaxAge(0)
+            .setPath("/");
+    }
+
+    /// Formats the cookie as a Set-Cookie header value.
+    pub fn format(self: Cookie, buf: []u8) ![]const u8 {
+        var fbs = std.io.fixedBufferStream(buf);
+        const writer = fbs.writer();
+
+        try writer.print("{s}={s}", .{ self.name, self.value });
+
+        if (self.domain) |d| try writer.print("; Domain={s}", .{d});
+        if (self.path) |p| try writer.print("; Path={s}", .{p});
+        if (self.max_age) |ma| try writer.print("; Max-Age={d}", .{ma});
+        if (self.expires) |e| try writer.print("; Expires={s}", .{e});
+        if (self.secure) try writer.writeAll("; Secure");
+        if (self.http_only) try writer.writeAll("; HttpOnly");
+        try writer.print("; SameSite={s}", .{self.same_site.toString()});
+        if (self.partitioned) try writer.writeAll("; Partitioned");
+
+        return fbs.getWritten();
+    }
+};
 
 /// HTTP response with fluent builder pattern support.
 pub const Response = struct {
@@ -180,6 +317,62 @@ pub const Response = struct {
         var resp = self;
         resp.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
         resp.headers.set("Pragma", "no-cache");
+        return resp;
+    }
+
+    /// Adds a Set-Cookie header from a Cookie struct.
+    pub fn withCookie(self: Response, cookie: Cookie) Response {
+        var resp = self;
+        var buf: [512]u8 = undefined;
+        const cookie_str = cookie.format(&buf) catch return resp;
+        resp.headers.set("Set-Cookie", cookie_str);
+        return resp;
+    }
+
+    /// Adds a simple Set-Cookie header (name=value only).
+    pub fn setCookie(self: Response, name: []const u8, value: []const u8) Response {
+        var resp = self;
+        var buf: [256]u8 = undefined;
+        const cookie_str = std.fmt.bufPrint(&buf, "{s}={s}; Path=/; HttpOnly; SameSite=Lax", .{ name, value }) catch return resp;
+        resp.headers.set("Set-Cookie", cookie_str);
+        return resp;
+    }
+
+    /// Adds a secure authentication cookie.
+    pub fn setAuthCookie(self: Response, name: []const u8, token: []const u8, max_age_seconds: i64) Response {
+        var resp = self;
+        var buf: [512]u8 = undefined;
+        const cookie_str = std.fmt.bufPrint(&buf, "{s}={s}; Path=/; Max-Age={d}; HttpOnly; Secure; SameSite=Strict", .{ name, token, max_age_seconds }) catch return resp;
+        resp.headers.set("Set-Cookie", cookie_str);
+        return resp;
+    }
+
+    /// Adds a cookie deletion header.
+    pub fn deleteCookie(self: Response, name: []const u8) Response {
+        var resp = self;
+        var buf: [128]u8 = undefined;
+        const cookie_str = std.fmt.bufPrint(&buf, "{s}=; Path=/; Max-Age=0", .{name}) catch return resp;
+        resp.headers.set("Set-Cookie", cookie_str);
+        return resp;
+    }
+
+    /// Creates a streaming response with Transfer-Encoding: chunked.
+    pub fn stream() Response {
+        var resp = Response{ .status = .ok, .body = "" };
+        resp.headers.set("Transfer-Encoding", "chunked");
+        resp.headers.set("X-Content-Type-Options", "nosniff");
+        return resp;
+    }
+
+    /// Creates a Server-Sent Events response.
+    pub fn sse() Response {
+        var resp = Response{
+            .status = .ok,
+            .body = "",
+            .content_type = "text/event-stream",
+        };
+        resp.headers.set("Cache-Control", "no-cache");
+        resp.headers.set("Connection", "keep-alive");
         return resp;
     }
 

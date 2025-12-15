@@ -1,5 +1,4 @@
-//! Error reporting and version utilities.
-//! Internal error logging and update checking.
+//! Error reporting utilities with GitHub issue integration and version checking.
 
 const std = @import("std");
 const version_info = @import("version.zig");

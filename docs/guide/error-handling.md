@@ -2,6 +2,20 @@
 
 Handle errors gracefully in api.zig applications.
 
+## Error Response Methods
+
+| Method | Status | Description |
+|--------|--------|-------------|
+| `Response.err(.bad_request, msg)` | 400 | Invalid input |
+| `Response.err(.unauthorized, msg)` | 401 | Auth required |
+| `Response.err(.forbidden, msg)` | 403 | Access denied |
+| `Response.err(.not_found, msg)` | 404 | Not found |
+| `Response.err(.method_not_allowed, msg)` | 405 | Wrong method |
+| `Response.err(.conflict, msg)` | 409 | Conflict |
+| `Response.err(.unprocessable_entity, msg)` | 422 | Validation failed |
+| `Response.err(.too_many_requests, msg)` | 429 | Rate limited |
+| `Response.err(.internal_server_error, msg)` | 500 | Server error |
+
 ## Error Responses
 
 Return error responses with appropriate status codes:
@@ -26,6 +40,12 @@ fn forbidden() api.Response {
 fn serverError() api.Response {
     return api.Response.err(.internal_server_error, "{\"error\":\"Internal server error\"}");
 }
+```
+
+**Example Output:**
+
+```json
+{"error":"Resource not found"}
 ```
 
 ## Conditional Error Handling

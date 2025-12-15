@@ -1,5 +1,4 @@
-//! OpenAPI 3.1 specification generator.
-//! Auto-generates JSON specs from route definitions.
+//! OpenAPI 3.1 specification generator with automatic schema extraction from Zig types.
 
 const std = @import("std");
 const json = @import("json.zig");

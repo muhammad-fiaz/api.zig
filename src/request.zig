@@ -1,5 +1,4 @@
-//! HTTP request parser.
-//! Parses request line, headers, query params, and body.
+//! HTTP request parser with header, query parameter, and body extraction.
 
 const std = @import("std");
 const http = @import("http.zig");

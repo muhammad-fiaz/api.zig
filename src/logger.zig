@@ -1,5 +1,4 @@
-//! Thread-safe logging with color support.
-//! Cross-platform for Windows, Linux, and macOS.
+//! Thread-safe structured logging with ANSI color support across Windows, Linux, and macOS.
 
 const std = @import("std");
 const builtin = @import("builtin");

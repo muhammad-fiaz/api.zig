@@ -10,9 +10,28 @@ const api = @import("api");
 const Logger = api.Logger;
 ```
 
+## LogConfig
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `level` | `Level` | `.info` | Minimum log level |
+| `colors` | `bool` | `true` | Enable ANSI colors |
+| `timestamps` | `bool` | `false` | Include timestamps |
+| `show_source` | `bool` | `false` | Show source location |
+| `format` | `Format` | `.simple` | Output format |
+| `output` | `Output` | `.stderr` | Output destination |
+| `include_thread_id` | `bool` | `false` | Show thread ID |
+
 ## Level
 
-Log levels in order of severity.
+Log levels in order of severity:
+
+| Level | Color | Value | Description |
+|-------|-------|-------|-------------|
+| `.debug` | Cyan | 0 | Detailed debugging |
+| `.info` | Green | 1 | General information |
+| `.warn` | Yellow | 2 | Warning messages |
+| `.err` | Red | 3 | Error messages |
 
 ```zig
 pub const Level = enum {
@@ -41,7 +60,23 @@ pub fn color(self: Level) []const u8
 
 Returns ANSI color code for the level.
 
-## Logger
+## Logger Methods
+
+| Method | Description |
+|--------|-------------|
+| `init(allocator)` | Create logger instance |
+| `deinit()` | Clean up resources |
+| `debug(msg, src)` | Log debug message |
+| `info(msg, src)` | Log info message |
+| `warn(msg, src)` | Log warning message |
+| `err(msg, src)` | Log error message |
+| `success(msg)` | Log success message |
+| `debugf(fmt, args, src)` | Log formatted debug |
+| `infof(fmt, args, src)` | Log formatted info |
+| `warnf(fmt, args, src)` | Log formatted warning |
+| `errf(fmt, args, src)` | Log formatted error |
+| `setLevel(level)` | Set minimum level |
+| `setColors(bool)` | Enable/disable colors |
 
 ### Creating a Logger
 

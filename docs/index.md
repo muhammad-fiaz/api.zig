@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "api.zig"
   text: "High-Performance API Framework"
-  tagline: Build blazing-fast APIs with compile-time safety and multi-threaded concurrency
+  tagline: Build blazing-fast APIs with compile-time safety, multi-threaded concurrency, GraphQL, WebSocket, and production-ready features
   actions:
     - theme: brand
       text: Get Started
@@ -20,21 +20,27 @@ features:
   - title: High Performance
     details: Zero runtime reflection with compile-time route validation for maximum speed
   - title: Multi-Threaded
-    details: Configurable thread pools with lock-free connection queue for concurrent request handling
+    details: Optimized thread pools with CPU-based auto-scaling and connection tracking
+  - title: GraphQL Support
+    details: Complete GraphQL implementation with schema definition, query parsing, and GraphiQL UI
+  - title: WebSocket
+    details: RFC 6455 compliant WebSocket with rooms, broadcasting, and event handlers
+  - title: Prometheus Metrics
+    details: Built-in metrics collection with counters, gauges, histograms, and health checks
+  - title: Caching
+    details: LRU caching with TTL expiration, response caching, and ETag support
+  - title: Session Management
+    details: Secure sessions with CSRF protection and cookie security
   - title: Automatic OpenAPI
     details: Auto-generated OpenAPI 3.1 specification with Swagger UI and ReDoc documentation
   - title: Type Safety
     details: Full compile-time type checking for routes, handlers, and extractors
-  - title: Zero Dependencies
-    details: Pure Zig implementation with no external dependencies required
+  - title: Production Ready
+    details: Centralized configs, security headers, rate limiting, and CORS out of the box
   - title: Cross-Platform
     details: Works on Linux, Windows, and macOS with native socket support
-  - title: HTTP Client
-    details: Built-in HTTP client for outbound requests with JSON parsing
-  - title: Static Files
-    details: Static file serving with MIME type detection and template rendering
-  - title: Configurable Logging
-    details: Thread-safe colorful logging with enable/disable access log option
+  - title: Comprehensive Middleware
+    details: Auth, logging, compression, rate limiting, security headers, and more
 ---
 
 <div class="vp-doc" style="padding: 0 24px;">
@@ -195,6 +201,72 @@ return templates.render("index.html", .{
 });
 ```
 
+## Advanced Features
+
+### GraphQL
+
+```zig
+var app = try api.App.init(allocator, .{});
+
+// Define schema
+var schema = api.graphql.Schema.init(allocator);
+try schema.setQueryType(.{
+    .name = "Query",
+    .fields = &.{
+        .{ .name = "users", .type_name = "User", .is_list = true },
+    },
+});
+
+// Enable GraphQL
+try app.enableGraphQL(&schema);
+
+// Endpoints: POST /graphql, GET /graphql (GraphiQL)
+```
+
+### WebSocket
+
+```zig
+try app.enableWebSocket(.{
+    .max_connections = 10000,
+    .ping_interval_ms = 30000,
+});
+
+app.router.get("/ws", fn(ctx: *api.Context) !void {
+    try ctx.response.upgradeWebSocket(.{
+        .on_message = onMessage,
+        .on_close = onClose,
+    });
+});
+```
+
+### Metrics & Health Checks
+
+```zig
+try app.enableMetrics(.{ .prefix = "myapp" });
+try app.enableHealthChecks();
+
+// GET /metrics -> Prometheus format
+// GET /health -> Health check endpoint
+```
+
+### Caching
+
+```zig
+try app.enableCaching(.{
+    .max_entries = 5000,
+    .default_ttl_seconds = 300,
+});
+```
+
+### Sessions
+
+```zig
+try app.enableSessions(.{
+    .secret = "your-secret-key-at-least-32-chars",
+    .max_age_seconds = 86400,
+});
+```
+
 ## Configuration
 
 ### AppConfig
@@ -211,12 +283,53 @@ return templates.render("index.html", .{
 
 ### RunConfig
 
-| Field         | Type         | Default       | Description                        |
-|---------------|--------------|---------------|------------------------------------|
-| `host`        | `[]const u8` | `"127.0.0.1"` | Bind address                       |
-| `port`        | `u16`        | `8000`        | Listen port                        |
-| `access_log`  | `bool`       | `true`        | Enable/disable access logging      |
+| Field         | Type         | Default       | Description                          |
+|---------------|--------------|---------------|--------------------------------------|
+| `host`        | `[]const u8` | `"127.0.0.1"` | Bind address                         |
+| `port`        | `u16`        | `8000`        | Listen port                          |
+| `access_log`  | `bool`       | `true`        | Enable/disable access logging        |
 | `num_threads` | `?u8`        | `null`        | Worker threads (null=auto, 0=single) |
-| `auto_port`   | `bool`       | `true`        | Auto-find port if busy             |
+| `auto_port`   | `bool`       | `true`        | Auto-find port if busy               |
+
+### Production Defaults
+
+api.zig provides `api.Defaults` for production-ready configurations:
+
+```zig
+// Use production defaults
+const server_config = api.Defaults.server;
+const cors_config = api.Defaults.cors;
+const rate_limit_config = api.Defaults.rateLimit;
+const security_config = api.Defaults.security;
+```
+
+### Centralized Configuration
+
+Use `api.FrameworkConfig` for unified configuration:
+
+```zig
+const config = api.FrameworkConfig{
+    .app = .{ .title = "My API" },
+    .server = .{ .port = 8080, .num_threads = 4 },
+    .cors = .{ .allowed_origins = &.{"https://example.com"} },
+    .rate_limit = .{ .requests_per_window = 100 },
+    .security = .{ .x_frame_options = .deny },
+    .graphql = .{ .enable_introspection = true },
+    .metrics = .{ .prefix = "myapp" },
+    .session = .{ .secret = "your-secret-key" },
+};
+```
+
+### Middleware Stack
+
+```zig
+// Recommended middleware order
+try app.use(api.recover);          // Catch panics
+try app.use(api.requestId);        // Request tracing
+try app.use(api.logger);           // Access logging
+try app.use(api.defaultSecurityHeaders); // Security headers
+try app.use(api.cors(.{}).handle); // CORS
+try app.use(api.rateLimit(.{}).handle); // Rate limiting
+```
 
 </div>

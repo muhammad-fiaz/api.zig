@@ -4,6 +4,13 @@ Handlers are functions that process HTTP requests and return responses. api.zig 
 
 ## Handler Signatures
 
+api.zig supports two handler signatures:
+
+| Signature | Use Case | Example |
+|-----------|----------|---------|
+| `fn() Response` | Static responses, no request data needed | Health checks, welcome pages |
+| `fn(*Context) Response` | Dynamic responses, access to request data | CRUD operations, authentication |
+
 ### Simple Handler (No Context)
 
 For handlers that don't need request data:
@@ -26,6 +33,7 @@ For handlers that need access to request data:
 fn getUser(ctx: *api.Context) api.Response {
     const id = ctx.param("id") orelse "0";
     // Process request...
+    _ = id;
     return api.Response.jsonRaw("{\"id\":1}");
 }
 ```
@@ -33,13 +41,35 @@ fn getUser(ctx: *api.Context) api.Response {
 ## Registering Handlers
 
 ```zig
-try app.get("/", hello);           // Simple handler
+try app.get("/", hello);             // Simple handler
 try app.get("/users/{id}", getUser); // Context handler
 ```
+
+## HTTP Methods
+
+| Method | Function | Typical Use |
+|--------|----------|-------------|
+| GET | `app.get()` | Retrieve resources |
+| POST | `app.post()` | Create resources |
+| PUT | `app.put()` | Replace resources |
+| PATCH | `app.patch()` | Partial update |
+| DELETE | `app.delete()` | Remove resources |
+| OPTIONS | `app.options()` | CORS preflight |
+| HEAD | `app.head()` | Headers only |
+| TRACE | `app.trace()` | Debug/diagnostic |
 
 ## Handler Return Types
 
 Handlers must return `api.Response`:
+
+| Method | Content-Type | Description |
+|--------|-------------|-------------|
+| `Response.jsonRaw()` | `application/json` | Raw JSON string |
+| `Response.json()` | `application/json` | Serialize struct |
+| `Response.text()` | `text/plain` | Plain text |
+| `Response.html()` | `text/html` | HTML content |
+| `Response.xml()` | `application/xml` | XML content |
+| `Response.err()` | `application/json` | Error response |
 
 ```zig
 fn myHandler() api.Response {
@@ -61,6 +91,16 @@ fn myHandler() api.Response {
 
 With context handlers, you can access:
 
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `ctx.param("name")` | `?[]const u8` | Path parameter |
+| `ctx.query("key")` | `?[]const u8` | Query parameter |
+| `ctx.body()` | `?[]const u8` | Request body |
+| `ctx.header("name")` | `?[]const u8` | Request header |
+| `ctx.method()` | `Method` | HTTP method |
+| `ctx.path()` | `[]const u8` | Request path |
+| `ctx.json(T)` | `!T` | Parse JSON body |
+
 ```zig
 fn handler(ctx: *api.Context) api.Response {
     // Path parameters
@@ -81,6 +121,7 @@ fn handler(ctx: *api.Context) api.Response {
     // Request path
     const path = ctx.path();
 
+    _ = .{ id, page, body, auth, method, path };
     return api.Response.text("ok");
 }
 ```

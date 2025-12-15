@@ -10,6 +10,32 @@ const Validator = api.Validator;
 const validation = api.validation;
 ```
 
+## Validation Functions Summary
+
+| Function | Description |
+|----------|-------------|
+| `isEmail(str)` | Validate email format |
+| `isUrl(str)` | Validate URL format |
+| `isNotEmpty(str)` | Check non-empty string |
+| `isLengthBetween(str, min, max)` | Validate string length |
+| `isNumeric(str)` | Check numeric string |
+| `isAlpha(str)` | Check alphabetic string |
+| `isAlphanumeric(str)` | Check alphanumeric string |
+| `matchesPattern(str, pattern)` | Match regex pattern |
+
+## Validator Builder Rules
+
+| Method | Description |
+|--------|-------------|
+| `.required(field)` | Field must be present |
+| `.minLength(field, len)` | Minimum string length |
+| `.maxLength(field, len)` | Maximum string length |
+| `.email(field)` | Must be valid email |
+| `.url(field)` | Must be valid URL |
+| `.minValue(field, val)` | Minimum numeric value |
+| `.maxValue(field, val)` | Maximum numeric value |
+| `.pattern(field, regex)` | Must match pattern |
+
 ## Validator Functions
 
 ### isEmail
@@ -120,6 +146,27 @@ pub const ErrorCode = enum {
     url,
     custom,
 };
+```
+
+### isUuid
+
+```zig
+pub fn isUuid(uuid_str: []const u8) bool
+```
+
+Validates UUID v4 format.
+
+```zig
+validation.isUuid("123e4567-e89b-12d3-a456-426614174000")  // true
+validation.isUuid("invalid-uuid")                          // false
+```
+
+### uuid Rule
+
+Add UUID validation to the Validator builder.
+
+```zig
+_ = validator.uuid("user_id");
 ```
 
 ## Handler Example

@@ -2,6 +2,20 @@
 
 api.zig provides a fluent Response builder for constructing HTTP responses.
 
+## Response Methods
+
+| Method | Content-Type | Description |
+|--------|-------------|-------------|
+| `Response.jsonRaw()` | `application/json` | Raw JSON string |
+| `Response.json()` | `application/json` | Serialize Zig struct |
+| `Response.text()` | `text/plain; charset=utf-8` | Plain text |
+| `Response.html()` | `text/html; charset=utf-8` | HTML content |
+| `Response.xml()` | `application/xml` | XML content |
+| `Response.err()` | `application/json` | Error with status |
+| `Response.redirect()` | - | 302 redirect |
+| `Response.permanentRedirect()` | - | 301 redirect |
+| `Response.init()` | - | Empty response |
+
 ## Response Types
 
 ### JSON Response
@@ -13,6 +27,12 @@ api.Response.jsonRaw("{\"message\":\"Hello\"}")
 // With status code
 api.Response.jsonRaw("{\"id\":1}")
     .setStatus(.created)
+```
+
+**Output:**
+
+```json
+{"message":"Hello"}
 ```
 
 ### Text Response
@@ -45,7 +65,17 @@ api.Response.redirect("/new-location")
 api.Response.permanentRedirect("/new-location")
 ```
 
-## Builder Pattern
+## Builder Pattern Methods
+
+| Method | Description |
+|--------|-------------|
+| `.setStatus(status)` | Set HTTP status code |
+| `.setContentType(type)` | Override Content-Type header |
+| `.setHeader(name, value)` | Add custom header |
+| `.addHeader(name, value)` | Add additional header |
+| `.withCors(origin)` | Add CORS headers |
+| `.withCache(seconds)` | Set cache duration |
+| `.withNoCache()` | Disable caching |
 
 Chain methods to customize responses:
 
@@ -57,6 +87,21 @@ api.Response.text("Created")
 ```
 
 ## Setting Status Codes
+
+| Code | Constant | Description |
+|------|----------|-------------|
+| 200 | `.ok` | Success |
+| 201 | `.created` | Resource created |
+| 204 | `.no_content` | Success, no body |
+| 301 | `.moved_permanently` | Permanent redirect |
+| 302 | `.found` | Temporary redirect |
+| 400 | `.bad_request` | Invalid request |
+| 401 | `.unauthorized` | Auth required |
+| 403 | `.forbidden` | Access denied |
+| 404 | `.not_found` | Not found |
+| 422 | `.unprocessable_entity` | Validation failed |
+| 429 | `.too_many_requests` | Rate limited |
+| 500 | `.internal_server_error` | Server error |
 
 ```zig
 .setStatus(.ok)              // 200

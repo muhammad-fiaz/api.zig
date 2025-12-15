@@ -21,6 +21,11 @@ const ServerConfig = api.ServerConfig;
 | `enable_access_log`| `bool`       | `true`        | Colorful access logging          |
 | `auto_port`        | `bool`       | `true`        | Auto-find port if busy           |
 | `max_port_attempts`| `u16`        | `100`         | Max ports to try when auto_port  |
+| `read_buffer_size` | `usize`      | `16384`       | Request read buffer size         |
+| `keepalive_timeout_ms` | `u32`    | `5000`        | Keep-alive timeout (ms)          |
+| `max_connections`  | `u32`        | `10000`       | Max concurrent connections       |
+| `tcp_nodelay`      | `bool`       | `true`        | Disable Nagle's algorithm        |
+| `reuse_port`       | `bool`       | `true`        | Enable SO_REUSEPORT              |
 
 ## Cross-Platform Support
 

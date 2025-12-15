@@ -11,12 +11,39 @@ const Response = api.Response;
 
 ## Fields
 
-| Field          | Type         | Description         |
-| -------------- | ------------ | ------------------- |
-| `status`       | `StatusCode` | HTTP status code    |
-| `headers`      | `HeaderList` | Response headers    |
-| `body`         | `[]const u8` | Response body       |
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | `StatusCode` | HTTP status code |
+| `headers` | `HeaderList` | Response headers |
+| `body` | `[]const u8` | Response body |
 | `content_type` | `[]const u8` | Content-Type header |
+
+## Constructor Summary
+
+| Constructor | Content-Type | Description |
+|-------------|-------------|-------------|
+| `init()` | - | Empty response |
+| `jsonRaw(str)` | `application/json` | Raw JSON string |
+| `json(value)` | `application/json` | Serialize Zig value |
+| `text(str)` | `text/plain; charset=utf-8` | Plain text |
+| `html(str)` | `text/html; charset=utf-8` | HTML content |
+| `xml(str)` | `application/xml` | XML content |
+| `err(status, msg)` | `application/json` | Error with status |
+| `redirect(url)` | - | 302 redirect |
+| `permanentRedirect(url)` | - | 301 redirect |
+
+## Builder Methods Summary
+
+| Method | Description |
+|--------|-------------|
+| `.setStatus(status)` | Set HTTP status code |
+| `.setHeader(name, value)` | Add response header |
+| `.addHeader(name, value)` | Add additional header |
+| `.setContentType(type)` | Override Content-Type |
+| `.setBody(content)` | Set response body |
+| `.withCors(origin)` | Add CORS headers |
+| `.withCache(seconds)` | Set cache duration |
+| `.withNoCache()` | Disable caching |
 
 ## Constructors
 

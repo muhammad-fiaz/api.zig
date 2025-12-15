@@ -58,11 +58,38 @@ pub fn main() !void {
 zig build run
 ```
 
+**Output:**
+
+```
+[OK] http://127.0.0.1:8000
+[INFO]   /docs   - Interactive API Documentation
+[INFO]   /redoc  - API Reference
+```
+
 Visit:
 
 - http://localhost:8000/ - Your API
-- http://localhost:8000/docs - Interactive API Documentation
-- http://localhost:8000/redoc - API Reference
+- http://localhost:8000/docs - Swagger UI (Interactive API Documentation)
+- http://localhost:8000/redoc - ReDoc (API Reference)
+
+## App Init Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | `[]const u8` | `"API"` | OpenAPI document title |
+| `version` | `[]const u8` | `"0.0.0"` | API version string |
+| `description` | `[]const u8` | `""` | API description |
+
+## Server Run Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `port` | `u16` | `8000` | Port to listen on |
+| `address` | `[]const u8` | `"127.0.0.1"` | Bind address |
+| `num_threads` | `?u32` | CPU count | Worker thread count |
+| `enable_access_log` | `bool` | `true` | Enable request logging |
+| `auto_port` | `bool` | `true` | Auto-find available port |
+| `max_port_attempts` | `u16` | `100` | Max ports to try |
 
 ## Features
 
@@ -73,7 +100,23 @@ If port 8000 is busy, the server automatically finds an available port:
 ```zig
 try app.run(.{ 
     .port = 8000,
-    .auto_port = true,  // Default: true
+    .auto_port = true,      // Default: true
+    .max_port_attempts = 50, // Try up to 50 ports
+});
+```
+
+### Multi-Threading
+
+Automatically scales to CPU cores:
+
+```zig
+try app.run(.{ 
+    .num_threads = null,  // Auto-detect CPU cores (default)
+});
+
+// Or specify explicitly
+try app.run(.{ 
+    .num_threads = 8,     // Use 8 worker threads
 });
 ```
 
@@ -81,8 +124,8 @@ try app.run(.{
 
 api.zig works on:
 - **Windows** - Full support with Winsock2
-- **Linux** - Native POSIX sockets
-- **macOS** - Native POSIX sockets
+- **Linux** - Native POSIX sockets with epoll
+- **macOS** - Native POSIX sockets with kqueue
 
 ## Next Steps
 

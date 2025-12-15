@@ -1,6 +1,4 @@
-//! Static File Server and Template Engine
-//!
-//! Static file serving, HTML templates, and file response utilities.
+//! Static file serving with directory browsing, SPA support, and HTML templates.
 
 const std = @import("std");
 const Context = @import("context.zig").Context;
@@ -92,10 +90,6 @@ pub const StaticFiles = struct {
 
 // Backward compatibility alias
 pub const StaticRouter = StaticFiles;
-
-// ============================================================================
-// Templates
-// ============================================================================
 
 /// HTML template engine with variable substitution.
 pub const Templates = struct {
@@ -206,10 +200,6 @@ pub const Templates = struct {
     }
 };
 
-// ============================================================================
-// HTML Response Helpers
-// ============================================================================
-
 /// Create an HTML response from raw content.
 pub fn HTMLResponse(content: []const u8) Response {
     return Response.html(content);
@@ -219,10 +209,6 @@ pub fn HTMLResponse(content: []const u8) Response {
 pub fn HTMLResponseWithStatus(content: []const u8, status: http.StatusCode) Response {
     return Response.html(content).setStatus(status);
 }
-
-// ============================================================================
-// File Response Helpers
-// ============================================================================
 
 /// Create a file download response.
 pub fn FileResponse(allocator: std.mem.Allocator, path: []const u8, filename: ?[]const u8) Response {
@@ -252,18 +238,10 @@ pub fn FileResponse(allocator: std.mem.Allocator, path: []const u8, filename: ?[
     return resp;
 }
 
-// ============================================================================
-// Streaming Response
-// ============================================================================
-
 /// Streaming response for large content.
 pub fn StreamingResponse(content: []const u8, media_type: []const u8) Response {
     return Response.ok(content).setContentType(media_type);
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 test "HTMLResponse" {
     const resp = HTMLResponse("<h1>Hello</h1>");

@@ -9,6 +9,18 @@ const api = @import("api");
 const json = api.json;
 ```
 
+## Function Summary
+
+| Function | Description |
+|----------|-------------|
+| `parse(T, allocator, str)` | Parse JSON string to typed struct |
+| `parseValue(allocator, str)` | Parse JSON to dynamic value |
+| `stringify(allocator, value, opts)` | Convert value to JSON string |
+| `toJson(allocator, value)` | Stringify with defaults |
+| `toPrettyJson(allocator, value)` | Stringify with formatting |
+| `isValid(str)` | Check if string is valid JSON |
+| `escapeString(allocator, str)` | Escape special characters |
+
 ## Functions
 
 ### parse
@@ -29,6 +41,9 @@ const user = try json.parse(User, allocator, "{\"id\":1,\"name\":\"John\"}");
 // user.id = 1
 // user.name = "John"
 ```
+
+**Input:** `{"id":1,"name":"John"}`
+**Result:** `User{ .id = 1, .name = "John" }`
 
 ### parseValue
 

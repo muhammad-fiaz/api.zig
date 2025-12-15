@@ -1,5 +1,4 @@
-//! HTTP types and utilities.
-//! Methods, status codes, headers, and MIME types.
+//! HTTP protocol types including methods, status codes, headers, and MIME types.
 
 const std = @import("std");
 

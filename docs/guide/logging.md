@@ -2,14 +2,26 @@
 
 api.zig includes a cross-platform colorful logging system that works on Windows, Linux, and macOS.
 
+## LogConfig Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `level` | `LogLevel` | `.info` | Minimum log level |
+| `colors` | `bool` | `true` | Enable ANSI colors |
+| `timestamps` | `bool` | `false` | Include timestamps |
+| `show_source` | `bool` | `false` | Show source location |
+| `format` | `enum` | `.simple` | Output format |
+| `output` | `enum` | `.stderr` | Output destination |
+| `include_thread_id` | `bool` | `false` | Show thread ID |
+
 ## Log Levels
 
-| Level   | Color  | Description                    |
-| ------- | ------ | ------------------------------ |
-| `debug` | Cyan   | Detailed debugging information |
-| `info`  | Green  | General information messages   |
-| `warn`  | Yellow | Warning messages               |
-| `err`   | Red    | Error messages                 |
+| Level | Color | Value | Description |
+|-------|-------|-------|-------------|
+| `.debug` | Cyan | 0 | Detailed debugging information |
+| `.info` | Green | 1 | General information messages |
+| `.warn` | Yellow | 2 | Warning messages |
+| `.err` | Red | 3 | Error messages |
 
 ## Using the Logger
 
@@ -106,17 +118,26 @@ Enable access logging in server config:
 ```zig
 try app.run(.{
     .port = 8000,
-    .access_log = true,  // Enable access logging
+    .enable_access_log = true,  // Enable access logging (default: true)
 });
 ```
 
-Output:
+**Output:**
 
 ```
 [INFO] GET /users
 [INFO] POST /users
 [INFO] GET /users/123
 [INFO] DELETE /users/123
+```
+
+## Disable Logging
+
+```zig
+try app.run(.{
+    .port = 8000,
+    .enable_access_log = false,  // Disable request logging
+});
 ```
 
 ## Print Version Info

@@ -11,6 +11,25 @@ fn handler(ctx: *api.Context) api.Response {
 }
 ```
 
+## Context Methods
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `ctx.param("name")` | `?[]const u8` | Get path parameter |
+| `ctx.paramAs(T, "name")` | `!T` | Get and parse path parameter |
+| `ctx.query("key")` | `?[]const u8` | Get query parameter |
+| `ctx.queryOr("key", default)` | `[]const u8` | Get query with default |
+| `ctx.queryAs(T, "key")` | `!T` | Get and parse query parameter |
+| `ctx.queryAsOr(T, "key", default)` | `T` | Get and parse with default |
+| `ctx.header("name")` | `?[]const u8` | Get request header |
+| `ctx.body()` | `?[]const u8` | Get request body |
+| `ctx.json(T)` | `!T` | Parse JSON body to struct |
+| `ctx.method()` | `Method` | Get HTTP method |
+| `ctx.path()` | `[]const u8` | Get request path |
+| `ctx.setHeader(name, value)` | `void` | Set response header |
+| `ctx.set(key, ptr)` | `void` | Store value in context |
+| `ctx.get(T, key)` | `?*T` | Retrieve stored value |
+
 ## Path Parameters
 
 ```zig

@@ -109,10 +109,19 @@ zig build run
 ```
 [OK] http://127.0.0.1:8000
 [INFO]   /docs   - Interactive API Documentation
-[INFO]   /redoc  - ReDoc
+[INFO]   /redoc  - API Reference
+```
+
+## Access Log Output
+
+```
 [INFO] GET /
+[INFO] GET /health
 [INFO] GET /users
+[INFO] GET /users/1
 [INFO] POST /users
+[INFO] PUT /users/1
+[INFO] DELETE /users/1
 ```
 
 ## API Endpoints
@@ -155,9 +164,45 @@ curl -X DELETE http://localhost:8000/users/1
 # (204 No Content)
 ```
 
+## Configuration Options
+
+### App Init Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `title` | `[]const u8` | API title for OpenAPI docs |
+| `version` | `[]const u8` | API version string |
+| `description` | `[]const u8` | API description |
+
+### Server Run Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `port` | `u16` | `8000` | Port to listen on |
+| `address` | `[]const u8` | `"127.0.0.1"` | Bind address |
+| `num_threads` | `?u32` | CPU cores | Worker thread count |
+| `enable_access_log` | `bool` | `true` | Enable request logging |
+| `max_body_size` | `usize` | `10MB` | Max request body size |
+| `read_buffer_size` | `usize` | `16KB` | Per-connection buffer |
+| `tcp_nodelay` | `bool` | `true` | Disable Nagle's algorithm |
+| `reuse_port` | `bool` | `false` | SO_REUSEPORT option |
+
+## HTTP Status Codes
+
+| Code | Constant | Usage |
+|------|----------|-------|
+| 200 | `.ok` | Successful GET/PUT |
+| 201 | `.created` | Successful POST |
+| 204 | `.no_content` | Successful DELETE |
+| 400 | `.bad_request` | Invalid request |
+| 404 | `.not_found` | Resource not found |
+| 500 | `.internal_server_error` | Server error |
+
 ## Key Features
 
-- **Multi-threading**: Uses 4 worker threads for concurrent requests
-- **RESTful design**: Standard HTTP methods for CRUD operations
-- **JSON responses**: All endpoints return JSON
-- **Status codes**: Appropriate HTTP status codes (200, 201, 204)
+- **Multi-threading**: Uses configurable worker threads for concurrent requests
+- **RESTful design**: Standard HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD, TRACE)
+- **JSON responses**: All endpoints return JSON with proper Content-Type
+- **Status codes**: Appropriate HTTP status codes with compile-time safety
+- **Path parameters**: Automatic extraction with `ctx.param("id")`
+- **OpenAPI docs**: Auto-generated at `/docs` (Swagger) and `/redoc` (ReDoc)

@@ -8,11 +8,41 @@ OpenAPI 3.1 specification generator with automatic schema inference from Zig typ
 const api = @import("api");
 const OpenAPI = api.OpenAPI;
 const Schema = api.Schema;
+const SchemaBuilder = api.SchemaBuilder;
 ```
 
-## OpenAPI
+## SchemaBuilder Methods
 
-### OpenAPI.Info
+| Method | Description |
+|--------|-------------|
+| `string()` | String type |
+| `integer()` | Integer type |
+| `int32()` | 32-bit integer |
+| `int64()` | 64-bit integer |
+| `number()` | Number type |
+| `float()` | 32-bit float |
+| `double()` | 64-bit float |
+| `boolean()` | Boolean type |
+| `email()` | Email format string |
+| `uuid()` | UUID format string |
+| `date()` | Date format string |
+| `dateTime()` | DateTime format string |
+| `uri()` | URI format string |
+| `password()` | Password format string |
+| `array(items)` | Array with item schema |
+| `object()` | Object schema |
+| `nullable()` | Make nullable |
+
+## OpenAPI.Info
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | `[]const u8` | API title |
+| `version` | `[]const u8` | API version |
+| `description` | `?[]const u8` | API description |
+| `terms_of_service` | `?[]const u8` | Terms URL |
+| `contact` | `?Contact` | Contact info |
+| `license` | `?License` | License info |
 
 ```zig
 pub const Info = struct {
@@ -35,11 +65,17 @@ const openapi = OpenAPI.init(allocator, .{
 });
 ```
 
-## Schema
+## Schema Types
 
-JSON Schema definitions for OpenAPI.
-
-### Schema Types
+| Type | Constant | Description |
+|------|----------|-------------|
+| String | `.string` | Text values |
+| Integer | `.integer` | Whole numbers |
+| Number | `.number` | Decimal numbers |
+| Boolean | `.boolean` | True/false |
+| Array | `.array` | List of items |
+| Object | `.object` | Key-value pairs |
+| Null | `.null_type` | Null value |
 
 ```zig
 pub const SchemaType = enum {
@@ -53,44 +89,24 @@ pub const SchemaType = enum {
 };
 ```
 
-### Schema Builders
-
-```zig
-Schema.string()   // String schema
-Schema.integer()  // Integer schema
-Schema.number()   // Number schema
-Schema.boolean()  // Boolean schema
-Schema.object()   // Object schema
-Schema.array(itemSchema)  // Array schema
-```
-
-### Schema from Type
-
-```zig
-pub fn schemaFromType(comptime T: type) Schema
-```
-
-Generates schema from Zig type.
-
-```zig
-const UserSchema = api.schemaFromType(struct {
-    id: u32,
-    name: []const u8,
-    active: bool,
-});
-```
-
 ## Built-in Endpoints
 
-The server automatically provides:
-
-| Endpoint        | Description               |
-| --------------- | ------------------------- |
-| `/openapi.json` | OpenAPI 3.1 specification |
-| `/docs`         | Interactive API Docs      |
-| `/redoc`        | API Reference             |
+| Endpoint | Description |
+|----------|-------------|
+| `/openapi.json` | OpenAPI 3.1 JSON specification |
+| `/docs` | Swagger UI (Interactive API Documentation) |
+| `/redoc` | ReDoc (API Reference) |
 
 ## App Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `title` | `[]const u8` | `"API"` | OpenAPI title |
+| `version` | `[]const u8` | `"0.0.0"` | API version |
+| `description` | `?[]const u8` | `null` | API description |
+| `docs_url` | `[]const u8` | `"/docs"` | Swagger UI path |
+| `redoc_url` | `[]const u8` | `"/redoc"` | ReDoc path |
+| `openapi_url` | `[]const u8` | `"/openapi.json"` | Spec path |
 
 ```zig
 var app = api.App.init(allocator, .{

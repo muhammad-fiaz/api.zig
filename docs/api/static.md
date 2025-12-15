@@ -9,6 +9,16 @@ const api = @import("api");
 const static = api.static;
 ```
 
+## StaticConfig
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `root_path` | `[]const u8` | required | Directory path |
+| `url_prefix` | `[]const u8` | `"/"` | URL prefix |
+| `index_file` | `?[]const u8` | `"index.html"` | Default index |
+| `cache_control` | `?[]const u8` | `null` | Cache header |
+| `fallback_handler` | `?Handler` | `null` | 404 handler |
+
 ## StaticRouter
 
 Handles serving files from a directory.
@@ -26,8 +36,24 @@ fn serveFile(ctx: *api.Context) api.Response {
     return static_router.serveFile(ctx.allocator, "public/style.css");
 }
 
-app.get("/style.css", serveFile);
+try app.get("/style.css", serveFile);
 ```
+
+## MIME Types
+
+| Extension | MIME Type |
+|-----------|-----------|
+| `.html` | `text/html; charset=utf-8` |
+| `.css` | `text/css` |
+| `.js` | `application/javascript` |
+| `.json` | `application/json` |
+| `.png` | `image/png` |
+| `.jpg`, `.jpeg` | `image/jpeg` |
+| `.gif` | `image/gif` |
+| `.svg` | `image/svg+xml` |
+| `.ico` | `image/x-icon` |
+| `.woff`, `.woff2` | `font/woff`, `font/woff2` |
+| `.pdf` | `application/pdf` |
 
 ## Helpers
 
@@ -37,3 +63,10 @@ app.get("/style.css", serveFile);
 const mime = api.http.getMimeType("image.png");
 // "image/png"
 ```
+
+### Security
+
+The static file server includes:
+- **Path traversal protection**: Blocks `../` attacks
+- **Index file resolution**: Auto-serves `index.html`
+- **Content-Type detection**: Based on file extension

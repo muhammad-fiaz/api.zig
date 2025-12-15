@@ -166,6 +166,16 @@ When you visit `http://localhost:8000/`, you'll see a beautifully styled page wi
 
 ## Response Types
 
+| Method | Content-Type | Description |
+|--------|-------------|-------------|
+| `Response.html()` | `text/html; charset=utf-8` | HTML pages |
+| `Response.text()` | `text/plain; charset=utf-8` | Plain text |
+| `Response.jsonRaw()` | `application/json` | Raw JSON string |
+| `Response.json()` | `application/json` | Serialize Zig struct |
+| `Response.xml()` | `application/xml` | XML content |
+
+### Response Examples
+
 ```zig
 // HTML response
 api.Response.html("<h1>Hello</h1>")
@@ -175,11 +185,45 @@ api.Response.jsonRaw("{\"key\":\"value\"}")
 
 // Text response
 api.Response.text("Plain text")
+
+// Custom content type
+api.Response.text(css_content).setContentType("text/css")
+
+// Set status code
+api.Response.html("<h1>Not Found</h1>").setStatus(.not_found)
+
+// Add custom headers
+api.Response.html(page).addHeader("X-Custom", "value")
 ```
 
-## Custom Content Types
+## Response Methods
 
-```zig
-api.Response.text(css_content)
-    .setContentType("text/css")
-```
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `.setStatus()` | `Response` | Set HTTP status code |
+| `.setContentType()` | `Response` | Override Content-Type header |
+| `.addHeader()` | `Response` | Add custom header |
+| `.redirect()` | `Response` | Create redirect response |
+| `.init()` | `Response` | Create empty response |
+
+## Common Content Types
+
+api.zig provides pre-defined content types via `api.ContentTypes`:
+
+| Constant | Value |
+|----------|-------|
+| `ContentTypes.HTML` | `text/html; charset=utf-8` |
+| `ContentTypes.TEXT` | `text/plain; charset=utf-8` |
+| `ContentTypes.JSON` | `application/json` |
+| `ContentTypes.XML` | `application/xml` |
+| `ContentTypes.CSS` | `text/css` |
+| `ContentTypes.JS` | `application/javascript` |
+| `ContentTypes.BINARY` | `application/octet-stream` |
+
+## Key Features
+
+- **HTML responses**: Using `api.Response.html()` with proper charset
+- **CSS styling**: Inline CSS for modern design patterns
+- **Mixed content**: Both HTML pages and JSON API on same server
+- **Responsive design**: Works on all screen sizes
+- **Auto documentation**: Swagger UI and ReDoc at `/docs` and `/redoc`

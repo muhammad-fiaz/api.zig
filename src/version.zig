@@ -1,5 +1,4 @@
-//! Library version info.
-//! Version constants and repository URLs.
+//! Library version information and repository metadata.
 
 /// Current library version.
 pub const version = "0.0.1";

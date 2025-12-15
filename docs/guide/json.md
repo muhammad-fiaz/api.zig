@@ -2,6 +2,17 @@
 
 api.zig includes JSON utilities for parsing and serialization.
 
+## JSON Methods
+
+| Method | Description |
+|--------|-------------|
+| `json.parse(T, allocator, str)` | Parse JSON string to struct |
+| `json.parseValue(allocator, str)` | Parse to dynamic value |
+| `json.stringify(allocator, value, opts)` | Serialize to JSON string |
+| `json.toPrettyJson(allocator, value)` | Serialize with formatting |
+| `json.isValid(str)` | Check if string is valid JSON |
+| `json.escapeString(allocator, str)` | Escape special characters |
+
 ## Parsing JSON
 
 ### Parse into Type
@@ -22,6 +33,14 @@ const user = try json.parse(User, allocator, json_str);
 // user.name = "John"
 // user.active = true
 ```
+
+**Input:**
+
+```json
+{"id":1,"name":"John","active":true}
+```
+
+**Result:** `User{ .id = 1, .name = "John", .active = true }`
 
 ### Parse Dynamic JSON
 

@@ -27,6 +27,8 @@
 
 ---
 
+> Note: This Project is in active development. Breaking changes may occur in minor releases.
+
 ## ✨ Features
 
 - 🚀 **High Performance** — Zero runtime reflection, compile-time route validation
@@ -168,14 +170,6 @@ api.Response.text("Created")
     .setHeader("X-Custom", "value")
     .withCors("*");
 ```
-
-## 📁 Examples
-
-| Example                                       | Description                          |
-| --------------------------------------------- | ------------------------------------ |
-| [`rest_api.zig`](examples/rest_api.zig)       | CRUD operations with multi-threading |
-| [`html_pages.zig`](examples/html_pages.zig)   | Serving HTML pages with CSS styling  |
-| [`path_params.zig`](examples/path_params.zig) | Working with dynamic URL segments    |
 
 Run an example:
 

@@ -12,27 +12,51 @@ const RouteConfig = api.RouteConfig;
 
 ## RouteConfig
 
-Route configuration structure.
+Route configuration structure:
 
-| Field         | Type                 | Description         |
-| ------------- | -------------------- | ------------------- |
-| `method`      | `Method`             | HTTP method         |
-| `path`        | `[]const u8`         | Route path pattern  |
-| `summary`     | `?[]const u8`        | OpenAPI summary     |
-| `description` | `?[]const u8`        | OpenAPI description |
-| `tags`        | `[]const []const u8` | OpenAPI tags        |
-| `deprecated`  | `bool`               | Mark as deprecated  |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `method` | `Method` | required | HTTP method |
+| `path` | `[]const u8` | required | Route path pattern |
+| `summary` | `?[]const u8` | `null` | OpenAPI summary |
+| `description` | `?[]const u8` | `null` | OpenAPI description |
+| `tags` | `[]const []const u8` | `&.{}` | OpenAPI tags |
+| `deprecated` | `bool` | `false` | Mark as deprecated |
 
 ## Route
 
-Compiled route entry.
+Compiled route entry:
 
-| Field           | Type         | Description        |
-| --------------- | ------------ | ------------------ |
-| `method`        | `Method`     | HTTP method        |
-| `path`          | `[]const u8` | Route path         |
-| `handler`       | `*const fn`  | Handler function   |
-| `segment_count` | `usize`      | Path segment count |
+| Field | Type | Description |
+|-------|------|-------------|
+| `method` | `Method` | HTTP method |
+| `path` | `[]const u8` | Route path |
+| `handler` | `*const fn` | Handler function |
+| `segment_count` | `usize` | Path segment count |
+
+## Router Methods Summary
+
+| Method | Description |
+|--------|-------------|
+| `init(allocator)` | Create new router |
+| `deinit()` | Release resources |
+| `addRoute(route)` | Add compiled route |
+| `match(method, path)` | Match request to route |
+| `setNotFound(handler)` | Set custom 404 handler |
+| `include_router(router, prefix, tags)` | Mount sub-router |
+
+## HTTP Method Registration
+
+| Method | Function |
+|--------|----------|
+| GET | `app.get(path, handler)` |
+| POST | `app.post(path, handler)` |
+| PUT | `app.put(path, handler)` |
+| DELETE | `app.delete(path, handler)` |
+| PATCH | `app.patch(path, handler)` |
+| OPTIONS | `app.options(path, handler)` |
+| HEAD | `app.head(path, handler)` |
+| TRACE | `app.trace(path, handler)` |
 
 ## Router Methods
 
@@ -106,6 +130,14 @@ pub fn matchPath(pattern: []const u8, path: []const u8) ?ParamList
 
 Matches a pattern against a path.
 
+### include_router
+
+```zig
+pub fn include_router(self: *Router, other: *const Router, prefix: []const u8, tags: []const []const u8) !void
+```
+
+Includes routes from another router (sub-router). This allows you to organize routes into separate modules and mount them at a specific prefix.
+
 ## ParamList
 
 Extracted path parameters.
@@ -126,6 +158,13 @@ pub const ParamList = struct {
 try app.get("/users", listUsers);
 try app.get("/users/{id}", getUser);
 try app.post("/users", createUser);
+
+// Using sub-routers
+var users_router = Router.init(allocator);
+try users_router.addRoute(Router.register(.GET, "/", listUsers));
+try users_router.addRoute(Router.register(.GET, "/{id}", getUser));
+
+try app.include_router(&users_router, "/api/v1/users", &.{ "users" });
 
 // Using Router directly
 var router = Router.init(allocator);

@@ -12,6 +12,22 @@ const Body = api.Body;
 const Header = api.Header;
 ```
 
+## Extractor Types Summary
+
+| Extractor | Source | Description |
+|-----------|--------|-------------|
+| `Path(T)` | URL path | Extract path parameters |
+| `Query(T)` | URL query | Extract query parameters |
+| `Body(T)` | Request body | Parse JSON body |
+| `Header(name)` | Headers | Extract header value |
+
+## Extractor Methods
+
+| Method | Description |
+|--------|-------------|
+| `.extract(ctx)` | Extract and parse data |
+| `.value` | Access extracted value |
+
 ## Path
 
 Extracts path parameters into a struct.
@@ -33,6 +49,9 @@ fn handler(ctx: *api.Context) api.Response {
     return api.Response.jsonRaw("{}");
 }
 ```
+
+**Request:** `GET /users/123/profile/john`
+**Result:** `{ .id = 123, .name = "john" }`
 
 ## Query
 
@@ -97,6 +116,47 @@ fn handler(ctx: *api.Context) api.Response {
     };
 
     _ = auth.value;  // Header value
+
+    return api.Response.jsonRaw("{}");
+}
+```
+
+## Cookie
+
+Extracts a specific cookie from the request.
+
+```zig
+const SessionCookie = api.extractors.Cookie("session_id");
+
+fn handler(ctx: *api.Context) api.Response {
+    const session = SessionCookie.extract(ctx) catch {
+        return api.Response.err(.unauthorized, "{}");
+    };
+
+    _ = session.value;  // Cookie value
+
+    return api.Response.jsonRaw("{}");
+}
+```
+
+## Depends (Dependency Injection)
+
+Calls a function to provide a dependency.
+
+```zig
+fn getDatabase(ctx: *api.Context) !Database {
+    _ = ctx;
+    return Database.init();
+}
+
+const DbDep = api.extractors.Depends(getDatabase);
+
+fn handler(ctx: *api.Context) api.Response {
+    const db = DbDep.extract(ctx) catch {
+        return api.Response.err(.internal_server_error, "{}");
+    };
+
+    _ = db.value;  // Database instance
 
     return api.Response.jsonRaw("{}");
 }

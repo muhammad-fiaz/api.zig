@@ -9,6 +9,34 @@ const api = @import("api");
 const Client = api.Client;
 ```
 
+## Client Methods Summary
+
+| Method | Description |
+|--------|-------------|
+| `init(allocator)` | Create new client |
+| `deinit()` | Release resources |
+| `get(url)` | GET request |
+| `post(url, body, headers)` | POST request |
+| `put(url, body, headers)` | PUT request |
+| `delete(url, headers)` | DELETE request |
+| `patch(url, body, headers)` | PATCH request |
+
+## Response Methods
+
+| Method | Description |
+|--------|-------------|
+| `deinit()` | Release response resources |
+| `json(T)` | Parse body as JSON type |
+
+## Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | `StatusCode` | HTTP status code |
+| `headers` | `Headers` | Response headers |
+| `body` | `[]const u8` | Response body |
+| `allocator` | `Allocator` | Memory allocator |
+
 ## Client Type
 
 The main client structure.
