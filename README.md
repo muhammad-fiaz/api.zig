@@ -27,7 +27,7 @@
 
 ---
 
-> Note: This Project is in active development. Breaking changes may occur in minor releases.
+> Note: This Project is in active development. Currently, Breaking changes may occur in every commit. Use at your own risk.
 
 ## ✨ Features
 

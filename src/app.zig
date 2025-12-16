@@ -384,7 +384,12 @@ pub const App = struct {
 
         // GraphQL endpoint handler with introspection support
         const GraphQLHandler = struct {
+            var logger: ?*Logger = null;
             var cached_introspection: []const u8 = "";
+
+            fn setLogger(l: *Logger) void {
+                logger = l;
+            }
 
             fn setCachedIntrospection(data: []const u8) void {
                 cached_introspection = data;
@@ -393,6 +398,7 @@ pub const App = struct {
             fn handle(ctx: *Context) Response {
                 // Handle CORS preflight
                 if (ctx.method() == .OPTIONS) {
+                    if (logger) |lg| lg.debug("[GraphQL] OPTIONS preflight received", null) catch {} else std.debug.print("[GraphQL] OPTIONS preflight received\n", .{});
                     return Response.init()
                         .setStatus(.no_content)
                         .setHeader("Access-Control-Allow-Origin", "*")
@@ -403,15 +409,21 @@ pub const App = struct {
 
                 // For POST requests, check if it's an introspection query
                 const body = ctx.body();
-                if (body.len > 0 and std.mem.indexOf(u8, body, "__schema") != null) {
-                    return Response.jsonRaw(cached_introspection)
-                        .setHeader("Access-Control-Allow-Origin", "*");
+                if (body.len > 0) {
+                    const snippet = if (body.len > 512) body[0..512] else body;
+                    if (logger) |lg| lg.debugf("[GraphQL] POST body (first 512 bytes): {s}", .{snippet}, null) catch {} else std.debug.print("[GraphQL] POST body (first 512 bytes): {s}\n", .{snippet});
+                    if (std.mem.indexOf(u8, body, "__schema") != null) {
+                        if (logger) |lg| lg.debug("[GraphQL] Detected introspection query in POST body", null) catch {} else std.debug.print("[GraphQL] Detected introspection query in POST body\n", .{});
+                        return Response.jsonRaw(cached_introspection)
+                            .setHeader("Access-Control-Allow-Origin", "*");
+                    }
                 }
 
                 // For GET requests with introspection
                 if (ctx.method() == .GET) {
                     if (ctx.query("query")) |query| {
                         if (std.mem.indexOf(u8, query, "__schema") != null) {
+                            if (logger) |lg| lg.debug("[GraphQL] Detected introspection query in GET", null) catch {} else std.debug.print("[GraphQL] Detected introspection query in GET\n", .{});
                             return Response.jsonRaw(cached_introspection)
                                 .setHeader("Access-Control-Allow-Origin", "*");
                         }
@@ -419,6 +431,7 @@ pub const App = struct {
                 }
 
                 // Default response for non-introspection queries
+                if (logger) |lg| lg.debug("[GraphQL] Non-introspection request received", null) catch {} else std.debug.print("[GraphQL] Non-introspection request received\n", .{});
                 return Response.json(.{ .data = null, .message = "Query execution not yet implemented" })
                     .setHeader("Access-Control-Allow-Origin", "*");
             }
@@ -426,6 +439,7 @@ pub const App = struct {
 
         // Set the cached introspection data
         GraphQLHandler.setCachedIntrospection(introspection_json);
+        GraphQLHandler.setLogger(self.logger);
 
         const PlaygroundHandler = struct {
             fn handle(ctx: *Context) Response {
