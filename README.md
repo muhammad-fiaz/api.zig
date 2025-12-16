@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ API.zig
+<img  alt="logo" src="https://github.com/user-attachments/assets/8c73f119-df49-46ac-ab5c-9dd5d216da4d" />
 
 <a href="https://muhammad-fiaz.github.io/api.zig/"><img src="https://img.shields.io/badge/docs-muhammad--fiaz.github.io-blue" alt="Documentation"></a>
 <a href="https://ziglang.org/"><img src="https://img.shields.io/badge/Zig-0.15.0+-orange.svg?logo=zig" alt="Zig Version"></a>
