@@ -41,6 +41,31 @@
 - 📦 **Zero Dependencies** - Pure Zig implementation
 - 🌐 **Cross-Platform** - Linux, Windows, macOS
 
+## UI Preview
+
+<table>
+  <tr>
+    <td>
+      <img src="https://github.com/user-attachments/assets/2a9141a4-7df1-45fa-846c-daafd2827585" />
+    </td>
+    <td>
+      <img src="https://github.com/user-attachments/assets/5fc85cce-e346-4fe6-b495-c1931550955e" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src="https://github.com/user-attachments/assets/d698a2ab-ea85-4fc0-82a6-0ac82a6bb310" />
+    </td>
+    <td>
+      <img src="https://github.com/user-attachments/assets/47ae9990-0026-4339-877f-0378f8922a2a" />
+    </td>
+  </tr>
+</table>
+
+
+
+
+
 ## 📦 Installation
 
 Add `api.zig` to your `build.zig.zon`:
