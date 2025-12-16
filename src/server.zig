@@ -1,4 +1,4 @@
-//! Multi-threaded HTTP server with automatic connection pooling, optimized I/O, and graceful shutdown.
+//! High-performance multi-threaded HTTP server with optimized I/O and connection management.
 
 const std = @import("std");
 const builtin = @import("builtin");

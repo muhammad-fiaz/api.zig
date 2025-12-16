@@ -1,6 +1,6 @@
 # Server
 
-Cross-platform HTTP server with Windows, Linux, and macOS support.
+High-performance multi-threaded HTTP server with cross-platform support.
 
 ## Import
 
@@ -12,30 +12,31 @@ const ServerConfig = api.ServerConfig;
 
 ## ServerConfig
 
-| Field              | Type         | Default       | Description                      |
-| ------------------ | ------------ | ------------- | -------------------------------- |
-| `address`          | `[]const u8` | `"127.0.0.1"` | Bind address                     |
-| `port`             | `u16`        | `8000`        | Listen port                      |
-| `max_body_size`    | `usize`      | `10MB`        | Max request body size            |
-| `num_threads`      | `?u8`        | `null`        | Worker threads (null=auto)       |
-| `enable_access_log`| `bool`       | `true`        | Colorful access logging          |
-| `auto_port`        | `bool`       | `true`        | Auto-find port if busy           |
-| `max_port_attempts`| `u16`        | `100`         | Max ports to try when auto_port  |
-| `read_buffer_size` | `usize`      | `16384`       | Request read buffer size         |
-| `keepalive_timeout_ms` | `u32`    | `5000`        | Keep-alive timeout (ms)          |
-| `max_connections`  | `u32`        | `10000`       | Max concurrent connections       |
-| `tcp_nodelay`      | `bool`       | `true`        | Disable Nagle's algorithm        |
-| `reuse_port`       | `bool`       | `true`        | Enable SO_REUSEPORT              |
+| Field                  | Type         | Default       | Description                           |
+| ---------------------- | ------------ | ------------- | ------------------------------------- |
+| `address`              | `[]const u8` | `"127.0.0.1"` | Server bind address                   |
+| `port`                 | `u16`        | `8000`        | Server listen port                    |
+| `max_body_size`        | `usize`      | `10MB`        | Maximum request body size             |
+| `num_threads`          | `?u8`        | `null`        | Worker thread count (null=auto-detect)|
+| `enable_access_log`    | `bool`       | `true`        | Enable HTTP access logging            |
+| `auto_port`            | `bool`       | `true`        | Auto-select available port            |
+| `max_port_attempts`    | `u16`        | `100`         | Maximum port search attempts          |
+| `read_buffer_size`     | `usize`      | `16384`       | Socket read buffer size               |
+| `keepalive_timeout_ms` | `u32`        | `5000`        | TCP keep-alive timeout                |
+| `max_connections`      | `u32`        | `10000`       | Maximum concurrent connections        |
+| `tcp_nodelay`          | `bool`       | `true`        | Disable Nagle's algorithm (TCP_NODELAY)|
+| `reuse_port`           | `bool`       | `true`        | Enable SO_REUSEPORT socket option     |
+| `disable_reserved_routes`| `bool`     | `false`       | Disable built-in documentation routes |
 
-## Cross-Platform Support
+## Platform Support
 
-The server automatically uses the correct socket APIs for each platform:
+Automatic platform-specific optimizations:
 
-| Platform | Socket API  | Color Support               |
+| Platform | Socket API  | Terminal Colors             |
 | -------- | ----------- | --------------------------- |
-| Windows  | Winsock2    | Virtual Terminal Processing |
-| Linux    | POSIX       | Native ANSI                 |
-| macOS    | POSIX       | Native ANSI                 |
+| Windows  | Winsock2    | Virtual Terminal Sequences  |
+| Linux    | POSIX       | ANSI Escape Codes           |
+| macOS    | POSIX       | ANSI Escape Codes           |
 
 ## Auto Port Selection
 
@@ -54,10 +55,10 @@ try app.run(.{
 ### init
 
 ```zig
-pub fn init(allocator: Allocator, router: *Router, config: ServerConfig) Server
+pub fn init(allocator: Allocator, router: *Router, config: ServerConfig) !Server
 ```
 
-Creates a new server.
+Initializes server instance with specified configuration.
 
 ### deinit
 
@@ -65,7 +66,7 @@ Creates a new server.
 pub fn deinit(self: *Server) void
 ```
 
-Releases server resources.
+Releases all server resources and closes connections.
 
 ### start
 
@@ -73,7 +74,7 @@ Releases server resources.
 pub fn start(self: *Server) !void
 ```
 
-Starts the HTTP server (blocking).
+Starts HTTP server and blocks until shutdown.
 
 ## Threading Modes
 
@@ -95,15 +96,17 @@ try app.run(.{ .port = 8000, .num_threads = 4 });
 try app.run(.{ .port = 8000, .num_threads = null });
 ```
 
-## Built-in Endpoints
+## Built-in Documentation Endpoints
 
-When running, the server provides:
+Automatic API documentation (can be disabled with `disable_reserved_routes`):
 
-| Endpoint        | Description              |
-| --------------- | ------------------------ |
-| `/docs`         | Interactive API Docs     |
-| `/redoc`        | API Reference            |
-| `/openapi.json` | OpenAPI specification    |
+| Endpoint              | Description                    |
+| --------------------- | ------------------------------ |
+| `/docs`               | Swagger UI (interactive)       |
+| `/redoc`              | ReDoc (reference)              |
+| `/openapi.json`       | OpenAPI 3.1 specification      |
+| `/graphql/playground` | GraphQL Playground (GraphiQL)  |
+| `/health`             | Health check endpoint          |
 
 ## Example
 
@@ -137,14 +140,15 @@ fn handler() api.Response {
 }
 ```
 
-## Output
+## Console Output
 
 ```
-[OK] http://127.0.0.1:8080
-[INFO]   /docs   - Interactive API Documentation
-[INFO]   /redoc  - API Reference
-[INFO] GET /
-[INFO] GET /docs
-[INFO] POST /users
+✓ http://127.0.0.1:8080
+ℹ  /docs       - Swagger UI 5.31.0 (REST API)
+ℹ  /redoc      - ReDoc 2.5.2 (REST API)
+ℹ  /graphql/playground - GraphQL Playground
+ℹ Running with 4 worker threads (optimized)
+ℹ GET /
+ℹ POST /users
 ```
 

@@ -226,6 +226,19 @@ pub const App = struct {
         try self.router.addRoute(r);
     }
 
+    /// Serves static files from a directory at the specified URL prefix.
+    pub fn serveStatic(self: *App, comptime url_prefix: []const u8, comptime directory: []const u8) !void {
+        const static_mod = @import("static.zig");
+        const handler = static_mod.StaticFiles.serve(.{
+            .root_path = directory,
+            .url_prefix = url_prefix,
+            .html5_mode = false,
+        });
+        const route_path = if (std.mem.eql(u8, url_prefix, "/")) "/{path...}" else url_prefix ++ "/{path...}";
+        try self.get(route_path, handler);
+        try self.logger.info("Static files: {s} -> {s}", .{ url_prefix, directory });
+    }
+
     /// Includes routes from an external module containing a routes declaration.
     pub fn include(self: *App, comptime routes_module: type) !void {
         if (@hasDecl(routes_module, "routes")) {

@@ -11,6 +11,7 @@ This section contains complete, runnable examples demonstrating api.zig features
 | [REST API](/examples/rest-api) | Complete CRUD API | Multi-threading, Path params, Status codes |
 | [HTML Pages](/examples/html-pages) | Server-rendered pages | HTML templates, CSS styling, Mixed content |
 | [Path Parameters](/examples/path-parameters) | Dynamic URL segments | Single/multiple params, Type conversion |
+| [Static File Server](/examples/static-files) | Serve directories | Directory serving, MIME types, Security |
 
 ### GraphQL
 
@@ -44,7 +45,13 @@ zig build run
 
 ## Source Files
 
-The main example is in `examples/main.zig` which demonstrates:
+Example files in `examples/` directory:
+
+- `hello_world.zig` - Minimal example
+- `static_file_server.zig` - Directory serving
+- `graphql_server.zig` - GraphQL API
+
+The main example demonstrates:
 
 - HTML pages with modern CSS templates
 - JSON API endpoints with proper status codes

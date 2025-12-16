@@ -1,6 +1,6 @@
 # App
 
-The main application type that orchestrates routing, middleware, and server lifecycle.
+Core application orchestrator for HTTP routing, middleware pipelines, and server lifecycle management.
 
 ## Import
 
@@ -11,29 +11,29 @@ const App = api.App;
 
 ## AppConfig
 
-Configuration for the application.
+Application configuration structure.
 
-| Field         | Type          | Default               | Description           |
-| ------------- | ------------- | --------------------- | --------------------- |
-| `title`       | `[]const u8`  | `"Zig API Framework"` | API title for OpenAPI |
-| `version`     | `[]const u8`  | `"1.0.0"`             | API version           |
-| `description` | `?[]const u8` | `null`                | API description       |
-| `debug`       | `bool`        | `false`               | Enable debug mode     |
-| `docs_url`    | `[]const u8`  | `"/docs"`             | Swagger UI path       |
-| `redoc_url`   | `[]const u8`  | `"/redoc"`            | ReDoc path            |
-| `openapi_url` | `[]const u8`  | `"/openapi.json"`     | OpenAPI spec path     |
+| Field         | Type          | Default               | Description                      |
+| ------------- | ------------- | --------------------- | -------------------------------- |
+| `title`       | `[]const u8`  | `"Zig API Framework"` | API title for OpenAPI spec       |
+| `version`     | `[]const u8`  | `"1.0.0"`             | API version string               |
+| `description` | `?[]const u8` | `null`                | Optional API description         |
+| `debug`       | `bool`        | `false`               | Enable debug logging             |
+| `docs_url`    | `[]const u8`  | `"/docs"`             | Swagger UI endpoint path         |
+| `redoc_url`   | `[]const u8`  | `"/redoc"`            | ReDoc documentation endpoint     |
+| `openapi_url` | `[]const u8`  | `"/openapi.json"`     | OpenAPI specification endpoint   |
 
 ## RunConfig
 
-Configuration for running the server.
+Server runtime configuration.
 
-| Field         | Type         | Default       | Description                          |
-| ------------- | ------------ | ------------- | ------------------------------------ |
-| `host`        | `[]const u8` | `"127.0.0.1"` | Bind address                         |
-| `port`        | `u16`        | `8000`        | Listen port                          |
-| `access_log`  | `bool`       | `true`        | Enable/disable access logging        |
-| `num_threads` | `?u8`        | `null`        | Worker threads (null=auto, 0=single) |
-| `auto_port`   | `bool`       | `true`        | Auto-find port if busy               |
+| Field         | Type         | Default       | Description                                    |
+| ------------- | ------------ | ------------- | ---------------------------------------------- |
+| `host`        | `[]const u8` | `"127.0.0.1"` | Server bind address                            |
+| `port`        | `u16`        | `8000`        | Server listen port                             |
+| `access_log`  | `bool`       | `true`        | Enable HTTP access logging                     |
+| `num_threads` | `?u8`        | `null`        | Worker thread count (null=auto-detect CPU)     |
+| `auto_port`   | `bool`       | `true`        | Automatically find available port if occupied  |
 
 ## Methods
 
@@ -43,15 +43,15 @@ Configuration for running the server.
 pub fn init(allocator: std.mem.Allocator, config: AppConfig) !App
 ```
 
-Creates a new application instance.
+Initializes a new application instance with specified configuration.
 
 ### initDefault
 
 ```zig
-pub fn initDefault(allocator: std.mem.Allocator) App
+pub fn initDefault(allocator: std.mem.Allocator) !App
 ```
 
-Creates an application with default configuration.
+Initializes application with default configuration values.
 
 ### deinit
 
@@ -59,7 +59,7 @@ Creates an application with default configuration.
 pub fn deinit(self: *App) void
 ```
 
-Releases application resources.
+Releases all allocated resources and cleans up application state.
 
 ### get
 
@@ -67,7 +67,7 @@ Releases application resources.
 pub fn get(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers a GET route.
+Registers HTTP GET route handler at compile-time.
 
 ### post
 
@@ -75,7 +75,7 @@ Registers a GET route.
 pub fn post(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers a POST route.
+Registers HTTP POST route handler at compile-time.
 
 ### put
 
@@ -83,7 +83,7 @@ Registers a POST route.
 pub fn put(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers a PUT route.
+Registers HTTP PUT route handler at compile-time.
 
 ### delete
 
@@ -91,7 +91,7 @@ Registers a PUT route.
 pub fn delete(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers a DELETE route.
+Registers HTTP DELETE route handler at compile-time.
 
 ### patch
 
@@ -99,7 +99,7 @@ Registers a DELETE route.
 pub fn patch(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers a PATCH route.
+Registers HTTP PATCH route handler at compile-time.
 
 ### options
 
@@ -107,7 +107,7 @@ Registers a PATCH route.
 pub fn options(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers an OPTIONS route for CORS preflight handling.
+Registers HTTP OPTIONS route handler for CORS preflight requests.
 
 ### head
 
@@ -115,7 +115,7 @@ Registers an OPTIONS route for CORS preflight handling.
 pub fn head(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers a HEAD route (returns headers only, no body).
+Registers HTTP HEAD route handler (headers only, no response body).
 
 ### trace
 
@@ -123,7 +123,7 @@ Registers a HEAD route (returns headers only, no body).
 pub fn trace(self: *App, comptime path: []const u8, handler: anytype) !void
 ```
 
-Registers a TRACE route for debugging request paths.
+Registers HTTP TRACE route handler for request path debugging.
 
 ### run
 
@@ -131,7 +131,7 @@ Registers a TRACE route for debugging request paths.
 pub fn run(self: *App, config: RunConfig) !void
 ```
 
-Starts the HTTP server.
+Starts HTTP server and begins accepting connections. Blocks until server shutdown.
 
 ### setNotFoundHandler
 
@@ -139,7 +139,7 @@ Starts the HTTP server.
 pub fn setNotFoundHandler(self: *App, handler: HandlerFn) void
 ```
 
-Sets a custom 404 handler.
+Configures custom handler for 404 Not Found responses.
 
 ### setErrorHandler
 
@@ -147,7 +147,7 @@ Sets a custom 404 handler.
 pub fn setErrorHandler(self: *App, handler: *const fn (*Context, anyerror) Response) void
 ```
 
-Sets a custom error handler.
+Configures custom handler for unhandled errors and exceptions.
 
 ## Example
 

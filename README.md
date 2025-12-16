@@ -16,7 +16,7 @@
 <a href="https://github.com/sponsors/muhammad-fiaz"><img src="https://img.shields.io/badge/Sponsor-💖-pink?style=social&logo=github" alt="GitHub Sponsors"></a>
 <a href="https://hits.sh/github.com/muhammad-fiaz/api.zig/"><img src="https://hits.sh/github.com/muhammad-fiaz/api.zig.svg?label=Visitors&extraCount=0&color=green" alt="Repo Visitors"></a>
 
-<p><em>High-performance, multi-threaded HTTP API framework for Zig — build blazing-fast APIs with compile-time safety.</em></p>
+<p><em>High-performance, multi-threaded HTTP API framework for Zig - build blazing-fast APIs with compile-time safety.</em></p>
 
 <b>📚 <a href="https://muhammad-fiaz.github.io/api.zig/">Documentation</a> |
 <a href="https://muhammad-fiaz.github.io/api.zig/api/">API Reference</a> |
@@ -31,14 +31,15 @@
 
 ## ✨ Features
 
-- 🚀 **High Performance** — Zero runtime reflection, compile-time route validation
-- ⚡ **Multi-Threaded** — Configurable thread pools for concurrent request handling
-- 📝 **Automatic OpenAPI** — Auto-generated OpenAPI 3.1 specification
-- 🎨 **Swagger UI & ReDoc** — Built-in interactive API documentation
-- 🔒 **Type Safety** — Full compile-time type checking for routes and handlers
-- 🔄 **Concurrency** — Thread-safe request handling with atomic counters
-- 📦 **Zero Dependencies** — Pure Zig implementation
-- 🌐 **Cross-Platform** — Linux, Windows, macOS
+- 🚀 **High Performance** - Zero runtime reflection, compile-time route validation
+- ⚡ **Multi-Threaded** - Configurable thread pools for concurrent request handling
+- 📝 **Automatic OpenAPI** - Auto-generated OpenAPI 3.1 specification
+- 🎨 **Swagger UI & ReDoc** - Built-in interactive API documentation (Swagger UI 5.31.0, ReDoc 2.5.2)
+- 🔒 **Type Safety** - Full compile-time type checking for routes and handlers
+- 🔄 **Concurrency** - Thread-safe request handling with atomic counters
+- 🎯 **GraphQL Support** - Built-in GraphQL Playground with GraphiQL 3.8.3
+- 📦 **Zero Dependencies** - Pure Zig implementation
+- 🌐 **Cross-Platform** - Linux, Windows, macOS
 
 ## 📦 Installation
 

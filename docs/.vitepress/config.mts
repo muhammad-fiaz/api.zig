@@ -4,6 +4,7 @@ export default defineConfig({
   title: "api.zig",
   description: "High-performance, multi-threaded HTTP API framework for Zig with GraphQL, WebSocket, and real-time support",
   base: '/api.zig/',
+  ignoreDeadLinks: true,
   
   head: [
     ['meta', { name: 'theme-color', content: '#f7a41d' }],
@@ -152,7 +153,8 @@ export default defineConfig({
             { text: 'Overview', link: '/examples/' },
             { text: 'REST API', link: '/examples/rest-api' },
             { text: 'HTML Pages', link: '/examples/html-pages' },
-            { text: 'Path Parameters', link: '/examples/path-parameters' }
+            { text: 'Path Parameters', link: '/examples/path-parameters' },
+            { text: 'Static Files', link: '/examples/static-files' }
           ]
         },
         {
