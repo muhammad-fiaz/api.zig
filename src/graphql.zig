@@ -900,37 +900,46 @@ pub const Schema = struct {
 
         // Add built-in scalar types
         const builtin_scalars = [_][]const u8{ "String", "Int", "Float", "Boolean", "ID" };
-        for (builtin_scalars, 0..) |scalar, i| {
-            if (i > 0) try writer.writeAll(",");
+        var first = true;
+        for (builtin_scalars) |scalar| {
+            if (!first) try writer.writeAll(",");
             try writer.print("{{\"name\":\"{s}\",\"kind\":\"SCALAR\",\"description\":null,\"fields\":null,\"inputFields\":null,\"interfaces\":null,\"enumValues\":null,\"possibleTypes\":null}}", .{scalar});
+            first = false;
         }
 
-        // Add schema types
-        var type_iter = self.types.iterator();
-        while (type_iter.next()) |entry| {
-            try writer.writeAll(",");
-            const type_def = entry.value_ptr.*;
-            try self.writeTypeIntrospection(writer, type_def);
-        }
+        // Always include root types first (avoid duplicates when iterating schema types)
+        var wrote_query: bool = false;
+        var wrote_mutation: bool = false;
+        var wrote_subscription: bool = false;
 
-        // Add root types if not in types map
         if (self.query_type) |qt| {
-            if (self.types.get(qt.name) == null) {
-                try writer.writeAll(",");
-                try self.writeTypeIntrospection(writer, qt.*);
-            }
+            if (!first) try writer.writeAll(",");
+            try self.writeTypeIntrospection(writer, qt.*);
+            wrote_query = true;
+            first = false;
         }
         if (self.mutation_type) |mt| {
-            if (self.types.get(mt.name) == null) {
-                try writer.writeAll(",");
-                try self.writeTypeIntrospection(writer, mt.*);
-            }
+            if (!first) try writer.writeAll(",");
+            try self.writeTypeIntrospection(writer, mt.*);
+            wrote_mutation = true;
+            first = false;
         }
         if (self.subscription_type) |st| {
-            if (self.types.get(st.name) == null) {
-                try writer.writeAll(",");
-                try self.writeTypeIntrospection(writer, st.*);
-            }
+            if (!first) try writer.writeAll(",");
+            try self.writeTypeIntrospection(writer, st.*);
+            wrote_subscription = true;
+            first = false;
+        }
+
+        // Add remaining schema types (skip any root types already written)
+        var type_iter = self.types.iterator();
+        while (type_iter.next()) |entry| {
+            const type_def = entry.value_ptr.*;
+            if (wrote_query and self.query_type != null and std.mem.eql(u8, type_def.name, self.query_type.?.name)) continue;
+            if (wrote_mutation and self.mutation_type != null and std.mem.eql(u8, type_def.name, self.mutation_type.?.name)) continue;
+            if (wrote_subscription and self.subscription_type != null and std.mem.eql(u8, type_def.name, self.subscription_type.?.name)) continue;
+            try writer.writeAll(",");
+            try self.writeTypeIntrospection(writer, type_def);
         }
 
         try writer.writeAll("],\"directives\":[]}}}");
@@ -1627,11 +1636,11 @@ pub fn graphqlHandler(config: GraphQLConfig) type {
                 if (ctx.query("query")) |query| {
                     return executeGraphQLQuery(ctx, query, ctx.query("operationName"), ctx.query("variables"));
                 }
-                return Response.err(.bad_request, "{\"errors\":[{\"message\":\"No query provided\"}]}");
+                return Response.err(.bad_request, "{\"errors\":[{\"message\":\"No query provided\"}]}").withCors("*");
             }
 
             if (body.len == 0) {
-                return Response.err(.bad_request, "{\"errors\":[{\"message\":\"Empty request body\"}]}");
+                return Response.err(.bad_request, "{\"errors\":[{\"message\":\"Empty request body\"}]}").withCors("*");
             }
 
             // Parse request
@@ -1642,7 +1651,7 @@ pub fn graphqlHandler(config: GraphQLConfig) type {
             };
 
             const request_data = json.parse(RequestBody, ctx.allocator, body) catch {
-                return Response.err(.bad_request, "{\"errors\":[{\"message\":\"Invalid JSON request body\"}]}");
+                return Response.err(.bad_request, "{\"errors\":[{\"message\":\"Invalid JSON request body\"}]}").withCors("*");
             };
 
             return executeGraphQLQuery(ctx, request_data.query, request_data.operationName, request_data.variables);
@@ -1658,7 +1667,7 @@ pub fn graphqlHandler(config: GraphQLConfig) type {
                 if (query.len == 64) { // SHA256 hash length
                     // Look up query by hash
                     // For now, return error since we don't have storage
-                    return Response.err(.bad_request, "{\"errors\":[{\"message\":\"Persisted query not found\"}]}");
+                    return Response.err(.bad_request, "{\"errors\":[{\"message\":\"Persisted query not found\"}]}").withCors("*");
                 }
             }
 
@@ -1667,7 +1676,7 @@ pub fn graphqlHandler(config: GraphQLConfig) type {
                 const depth = calculateQueryDepth(query);
                 if (depth > config.depth_config.max_depth) {
                     const err_msg = "{\"errors\":[{\"message\":\"Query depth exceeds maximum allowed\"}]}";
-                    return Response.err(.bad_request, err_msg);
+                    return Response.err(.bad_request, err_msg).withCors("*");
                 }
             }
 
@@ -1681,9 +1690,9 @@ pub fn graphqlHandler(config: GraphQLConfig) type {
 
             const result = executor.executeQuery(ctx, query, null) catch {
                 if (config.mask_errors) {
-                    return Response.err(.internal_server_error, "{\"errors\":[{\"message\":\"An unexpected error occurred\"}]}");
+                    return Response.err(.internal_server_error, "{\"errors\":[{\"message\":\"An unexpected error occurred\"}]}").withCors("*");
                 }
-                return Response.err(.internal_server_error, "{\"errors\":[{\"message\":\"Query execution failed\"}]}");
+                return Response.err(.internal_server_error, "{\"errors\":[{\"message\":\"Query execution failed\"}]}").withCors("*");
             };
 
             // Serialize response
@@ -1691,7 +1700,7 @@ pub fn graphqlHandler(config: GraphQLConfig) type {
 
             // Add CORS headers if enabled
             if (config.enable_cors) {
-                response = response.setHeader("Access-Control-Allow-Origin", "*");
+                response = response.withCors("*");
             }
 
             return response;
@@ -1715,7 +1724,7 @@ pub fn graphqlHandler(config: GraphQLConfig) type {
             var buffer: std.ArrayListUnmanaged(u8) = .{};
             const writer = buffer.writer(allocator);
 
-            writer.writeAll("{") catch return Response.err(.internal_server_error, "{}");
+            writer.writeAll("{") catch return Response.err(.internal_server_error, "{}").withCors("*");
 
             // Write data
             if (result.data) |data| {
@@ -1799,6 +1808,7 @@ pub fn graphqlPlayground(endpoint: []const u8) []const u8 {
 }
 
 /// GraphQL Playground with full configuration - uses local assets
+/// GraphQL Playground with full configuration - uses local assets (GraphiQL)
 pub fn graphqlPlaygroundWithConfig(config: GraphQLUIConfig) []const u8 {
     _ = config;
     return 
@@ -1808,45 +1818,36 @@ pub fn graphqlPlaygroundWithConfig(config: GraphQLUIConfig) []const u8 {
     \\  <title>GraphQL Playground</title>
     \\  <meta charset="utf-8">
     \\  <meta name="viewport" content="width=device-width, initial-scale=1">
-    \\  <link rel="stylesheet" href="/_assets/playground.css"/>
-    \\  <script src="/_assets/playground.js"></script>
+    \\  <link rel="stylesheet" href="/_assets/graphiql.min.css"/>
     \\  <style>
-    \\    body { margin: 0; padding: 0; overflow: hidden; }
-    \\    #root { height: 100vh; }
+    \\    body { height: 100vh; margin: 0; overflow: hidden; background: #0b0c0e; font-family: system-ui, sans-serif; }
+    \\    #graphiql { height: 100vh; }
+    \\    .loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0b0c0e; z-index: 9999; color: white; transition: opacity 0.5s; }
+    \\    .loader.hide { opacity: 0; pointer-events: none; }
+    \\    .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top-color: #e10098; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+    \\    @keyframes spin { to { transform: rotate(360deg); } }
     \\  </style>
     \\</head>
     \\<body>
-    \\  <div id="root"></div>
+    \\  <div class="loader" id="loader">
+    \\    <div class="spinner"></div>
+    \\    <div>Loading GraphQL Playground... 🚀</div>
+    \\  </div>
+    \\  <div id="graphiql"></div>
+    \\  <script src="/_assets/react.production.min.js"></script>
+    \\  <script src="/_assets/react-dom.production.min.js"></script>
+    \\  <script src="/_assets/graphiql.min.js"></script>
     \\  <script>
-    \\    window.addEventListener('load', function() {
-    \\      GraphQLPlayground.init(document.getElementById('root'), {
-    \\        endpoint: '/graphql',
-    \\        settings: {
-    \\          'editor.theme': 'dark',
-    \\          'editor.fontSize': 14,
-    \\          'editor.fontFamily': "'Source Code Pro', 'Consolas', 'Inconsolata', 'Droid Sans Mono', 'Monaco', monospace",
-    \\          'editor.reuseHeaders': true,
-    \\          'general.betaUpdates': false,
-    \\          'prettier.printWidth': 80,
-    \\          'prettier.tabWidth': 2,
-    \\          'prettier.useTabs': false,
-    \\          'request.credentials': 'same-origin',
-    \\          'schema.polling.enable': true,
-    \\          'schema.polling.interval': 2000,
-    \\          'schema.disableComments': false,
-    \\          'tracing.hideTracingResponse': true,
-    \\          'tracing.tracingSupported': true,
-    \\          'queryPlan.hideQueryPlanResponse': true
-    \\        },
-    \\        tabs: [{
-    \\          endpoint: '/graphql',
-    \\          query: '# Welcome to GraphQL Playground\\n#\\n# GraphQL Playground is an in-browser IDE for exploring GraphQL APIs\\n#\\n# Type your query here and press the Play button or Ctrl+Enter\\n\\nquery {\\n  __schema {\\n    types {\\n      name\\n    }\\n  }\\n}',
-    \\          variables: '{}',
-    \\          responses: [],
-    \\          headers: {}
-    \\        }]
-    \\      });
+    \\    const root = ReactDOM.createRoot(document.getElementById('graphiql'));
+    \\    const fetcher = GraphiQL.createFetcher({
+    \\      url: window.location.origin + '/graphql',
+    \\      headers: { 'Content-Type': 'application/json' }
     \\    });
+    \\    root.render(React.createElement(GraphiQL, {
+    \\      fetcher: fetcher,
+    \\      defaultEditorToolsVisibility: true
+    \\    }));
+    \\    setTimeout(() => document.getElementById('loader').classList.add('hide'), 500);
     \\  </script>
     \\</body>
     \\</html>

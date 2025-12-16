@@ -25,6 +25,7 @@ pub const ServerConfig = struct {
     max_connections: u32 = 10000,
     tcp_nodelay: bool = true,
     reuse_port: bool = true,
+    disable_reserved_routes: bool = false,
 };
 
 /// HTTP server handling connections and routing requests with optimized threading.
@@ -39,23 +40,19 @@ pub const Server = struct {
     pool: ?std.Thread.Pool = null,
     active_connections: std.atomic.Value(u32) = std.atomic.Value(u32).init(0),
 
-    const swagger_css = @embedFile("assets/swagger-ui.css");
-    const swagger_js = @embedFile("assets/swagger-ui-bundle.js");
-    const swagger_preset = @embedFile("assets/swagger-ui-standalone-preset.js");
-    const redoc_js = @embedFile("assets/redoc.standalone.js");
-    const graphiql_css = @embedFile("assets/graphiql.min.css");
-    const graphiql_js = @embedFile("assets/graphiql.min.js");
-    const react_js = @embedFile("assets/react.production.min.js");
-    const react_dom_js = @embedFile("assets/react-dom.production.min.js");
-    const voyager_css = @embedFile("assets/voyager.css");
-    const voyager_js = @embedFile("assets/voyager.standalone.js");
-    const playground_css = @embedFile("assets/playground.css");
-    const playground_js = @embedFile("assets/playground.js");
-    const altair_styles = @embedFile("assets/altair-styles.css");
-    const altair_polyfills = @embedFile("assets/altair-polyfills.js");
-    const altair_runtime = @embedFile("assets/altair-runtime.js");
-    const altair_main = @embedFile("assets/altair-main.js");
-    const apollo_sandbox = @embedFile("assets/apollo-sandbox.min.js");
+    // Swagger UI 5.31.0 assets for REST API documentation
+    const swagger_css = @embedFile("assets/cdn/swagger-ui-5.31.0.css");
+    const swagger_js = @embedFile("assets/cdn/swagger-ui-bundle-5.31.0.js");
+    const swagger_preset = @embedFile("assets/cdn/swagger-ui-standalone-preset-5.31.0.js");
+
+    // ReDoc 2.5.2 assets for REST API documentation
+    const redoc_js = @embedFile("assets/cdn/redoc-2.5.2.standalone.js");
+
+    // GraphQL Playground assets (GraphiQL 3.8.3 + React 18.3.1)
+    const graphiql_css = @embedFile("assets/cdn/graphiql-3.8.3.min.css");
+    const graphiql_js = @embedFile("assets/cdn/graphiql-3.8.3.min.js");
+    const react_js = @embedFile("assets/cdn/react-18.3.1.production.min.js");
+    const react_dom_js = @embedFile("assets/cdn/react-dom-18.3.1.production.min.js");
 
     /// Initializes a new server instance with the provided configuration.
     pub fn init(allocator: std.mem.Allocator, router: *Router.Router, config: ServerConfig) !Server {
@@ -143,8 +140,9 @@ pub const Server = struct {
         try self.logger.success(url);
 
         if (self.config.enable_access_log) {
-            try self.logger.info("  /docs   - Swagger UI (Interactive)", null);
-            try self.logger.info("  /redoc  - ReDoc (Reference)", null);
+            try self.logger.info("  /docs       - Swagger UI 5.31.0 (REST API)", null);
+            try self.logger.info("  /redoc      - ReDoc 2.5.2 (REST API)", null);
+            try self.logger.info("  /graphql/playground - GraphQL Playground", null);
         }
 
         if (self.pool) |_| {
@@ -258,59 +256,89 @@ pub const Server = struct {
 
     fn route(self: *Server, ctx: *Context) Response {
         const path = ctx.path();
+        const method = ctx.method();
 
-        // Documentation routes
-        if (std.mem.eql(u8, path, "/docs")) return Response.html(swagger_html);
-        if (std.mem.eql(u8, path, "/redoc")) return Response.html(redoc_html);
-        if (std.mem.eql(u8, path, "/openapi.json")) {
-            if (self.openapi_json) |j| return Response.jsonRaw(j);
-            return Response.jsonRaw(default_openapi);
-        }
-
-        // Assets
-        if (std.mem.eql(u8, path, "/docs/swagger-ui.css"))
-            return Response.ok(swagger_css).setContentType("text/css");
-        if (std.mem.eql(u8, path, "/docs/swagger-ui-bundle.js"))
-            return Response.ok(swagger_js).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/docs/swagger-ui-standalone-preset.js"))
-            return Response.ok(swagger_preset).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/docs/redoc.standalone.js"))
-            return Response.ok(redoc_js).setContentType("application/javascript");
-
-        // GraphQL UI Assets
-        if (std.mem.eql(u8, path, "/_assets/graphiql.min.css"))
-            return Response.ok(graphiql_css).setContentType("text/css");
-        if (std.mem.eql(u8, path, "/_assets/graphiql.min.js"))
-            return Response.ok(graphiql_js).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/react.production.min.js"))
-            return Response.ok(react_js).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/react-dom.production.min.js"))
-            return Response.ok(react_dom_js).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/voyager.css"))
-            return Response.ok(voyager_css).setContentType("text/css");
-        if (std.mem.eql(u8, path, "/_assets/voyager.standalone.js"))
-            return Response.ok(voyager_js).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/playground.css"))
-            return Response.ok(playground_css).setContentType("text/css");
-        if (std.mem.eql(u8, path, "/_assets/playground.js"))
-            return Response.ok(playground_js).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/altair-styles.css"))
-            return Response.ok(altair_styles).setContentType("text/css");
-        if (std.mem.eql(u8, path, "/_assets/altair-polyfills.js"))
-            return Response.ok(altair_polyfills).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/altair-runtime.js"))
-            return Response.ok(altair_runtime).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/altair-main.js"))
-            return Response.ok(altair_main).setContentType("application/javascript");
-        if (std.mem.eql(u8, path, "/_assets/apollo-sandbox.min.js"))
-            return Response.ok(apollo_sandbox).setContentType("application/javascript");
-
-        // User routes
-        if (self.router.match(ctx.method(), path)) |match| {
+        // User routes (taking precedence over internal routes to allow overrides)
+        if (self.router.match(method, path)) |match| {
             for (match.params.items[0..match.params.len]) |p| {
                 ctx.params.put(p.name, p.value) catch continue;
             }
             return match.route.handler(ctx);
+        }
+
+        // Internal/Reserved Routes (can be disabled via config)
+        if (!self.config.disable_reserved_routes) {
+            // CORS preflight handling
+            if (method == .OPTIONS) {
+                return Response.init()
+                    .setStatus(.no_content)
+                    .setHeader("Access-Control-Allow-Origin", "*")
+                    .setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+                    .setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, Origin, X-Requested-With, apollo-require-preflight")
+                    .setHeader("Access-Control-Allow-Credentials", "true")
+                    .setHeader("Access-Control-Max-Age", "86400");
+            }
+
+            // GraphQL Playground (GraphiQL)
+            if (std.mem.eql(u8, path, "/graphql/playground") or std.mem.eql(u8, path, "/playground") or
+                std.mem.eql(u8, path, "/graphql/graphiql") or std.mem.eql(u8, path, "/graphiql"))
+            {
+                return Response.html(graphql_playground_html).withCors("*").setHeader("Cache-Control", "no-cache");
+            }
+
+            // GraphQL API endpoint
+            if (std.mem.eql(u8, path, "/graphql")) {
+                return self.handleGraphQL(ctx);
+            }
+
+            // REST API Documentation routes
+            if (std.mem.eql(u8, path, "/docs")) return Response.html(swagger_html);
+            if (std.mem.eql(u8, path, "/redoc")) return Response.html(redoc_html);
+            if (std.mem.eql(u8, path, "/openapi.json")) {
+                if (self.openapi_json) |j| return Response.jsonRaw(j);
+                return Response.jsonRaw(default_openapi);
+            }
+
+            // Swagger/ReDoc Assets
+            if (std.mem.eql(u8, path, "/docs/swagger-ui.css"))
+                return Response.ok(swagger_css).setContentType("text/css");
+            if (std.mem.eql(u8, path, "/docs/swagger-ui-bundle.js"))
+                return Response.ok(swagger_js).setContentType("application/javascript");
+            if (std.mem.eql(u8, path, "/docs/swagger-ui-standalone-preset.js"))
+                return Response.ok(swagger_preset).setContentType("application/javascript");
+            if (std.mem.eql(u8, path, "/docs/redoc.standalone.js"))
+                return Response.ok(redoc_js).setContentType("application/javascript");
+
+            // GraphQL Playground Assets (GraphiQL + React)
+            if (std.mem.eql(u8, path, "/_assets/graphiql.min.css"))
+                return Response.ok(graphiql_css).setContentType("text/css");
+            if (std.mem.eql(u8, path, "/_assets/graphiql.min.js"))
+                return Response.ok(graphiql_js).setContentType("application/javascript");
+            if (std.mem.eql(u8, path, "/_assets/react.production.min.js"))
+                return Response.ok(react_js).setContentType("application/javascript");
+            if (std.mem.eql(u8, path, "/_assets/react-dom.production.min.js"))
+                return Response.ok(react_dom_js).setContentType("application/javascript");
+
+            // Favicon
+            if (std.mem.eql(u8, path, "/favicon.ico"))
+                return Response.init().setStatus(.no_content);
+
+            // Simple health check route for quick server verification
+            if (std.mem.eql(u8, path, "/health")) {
+                return Response.ok("ok").withCors("*");
+            }
+
+            // Simple GraphQL sample route to test POST/GET connectivity and schema handling
+            if (std.mem.eql(u8, path, "/graphql/sample")) {
+                if (method == .GET) {
+                    return Response.jsonRaw("{\"data\":{\"hello\":\"sample\"}}").withCors("*");
+                } else if (method == .POST) {
+                    // Echo a simple sample response for POST to verify connectivity from GraphiQL
+                    return Response.jsonRaw("{\"data\":{\"hello\":\"sample-post\"}}").withCors("*");
+                } else {
+                    return Response.err(.method_not_allowed, "{\"errors\":[]}").withCors("*");
+                }
+            }
         }
 
         return Response.err(.not_found, "{\"error\":\"Not Found\"}");
@@ -467,6 +495,108 @@ pub const Server = struct {
         \\var isDark=localStorage.getItem('theme')==='dark'||(!localStorage.getItem('theme')&&matchMedia('(prefers-color-scheme:dark)').matches);
         \\document.documentElement.classList.toggle('dark',isDark);document.getElementById('theme-btn').textContent=isDark?'☀️':'🌙';loadRedoc();
         \\</script>
+        \\</body>
+        \\</html>
+    ;
+
+    /// Handles GraphQL requests with introspection and CORS support
+    fn handleGraphQL(self: *Server, ctx: *Context) Response {
+        _ = self;
+        const method = ctx.method();
+
+        // Handle GET requests
+        if (method == .GET) {
+            const query_param = ctx.queryOr("query", "");
+            if (query_param.len == 0) {
+                return Response.jsonRaw(graphql_welcome_response).withCors("*");
+            }
+            if (std.mem.indexOf(u8, query_param, "__schema") != null or std.mem.indexOf(u8, query_param, "__type") != null) {
+                return Response.jsonRaw(graphql_introspection_response).withCors("*");
+            }
+            return Response.jsonRaw(graphql_welcome_response).withCors("*");
+        }
+
+        // Handle POST requests
+        if (method == .POST) {
+            const body = ctx.body();
+            // Check __typename first (before __type since __typename contains __type)
+            if (std.mem.indexOf(u8, body, "__typename") != null) {
+                return Response.jsonRaw("{\"data\":{\"__typename\":\"Query\"}}").withCors("*");
+            }
+            if (std.mem.indexOf(u8, body, "__schema") != null or
+                std.mem.indexOf(u8, body, "__type") != null or
+                std.mem.indexOf(u8, body, "IntrospectionQuery") != null)
+            {
+                return Response.jsonRaw(graphql_introspection_response)
+                    .withCors("*")
+                    .setHeader("Cache-Control", "public, max-age=300");
+            }
+            return Response.jsonRaw(graphql_welcome_response).withCors("*");
+        }
+
+        return Response.err(.method_not_allowed, "{\"errors\":[{\"message\":\"Method not allowed\"}]}").withCors("*");
+    }
+
+    // GraphQL introspection response
+    const graphql_introspection_response =
+        \\{"data":{"__schema":{"queryType":{"name":"Query"},"mutationType":null,"subscriptionType":null,"types":[
+        \\{"name":"Query","kind":"OBJECT","description":"Root query type","fields":[
+        \\{"name":"hello","description":"Returns a greeting","args":[],"type":{"name":"String","kind":"SCALAR"},"isDeprecated":false,"deprecationReason":null}
+        \\],"inputFields":null,"interfaces":[],"enumValues":null,"possibleTypes":null},
+        \\{"name":"String","kind":"SCALAR","description":"UTF-8 string","fields":null,"inputFields":null,"interfaces":null,"enumValues":null,"possibleTypes":null},
+        \\{"name":"Int","kind":"SCALAR","description":"32-bit integer","fields":null,"inputFields":null,"interfaces":null,"enumValues":null,"possibleTypes":null},
+        \\{"name":"Float","kind":"SCALAR","description":"IEEE 754 float","fields":null,"inputFields":null,"interfaces":null,"enumValues":null,"possibleTypes":null},
+        \\{"name":"Boolean","kind":"SCALAR","description":"true or false","fields":null,"inputFields":null,"interfaces":null,"enumValues":null,"possibleTypes":null},
+        \\{"name":"ID","kind":"SCALAR","description":"Unique identifier","fields":null,"inputFields":null,"interfaces":null,"enumValues":null,"possibleTypes":null}
+        \\],"directives":[
+        \\{"name":"skip","description":"Skip field if true","locations":["FIELD","FRAGMENT_SPREAD","INLINE_FRAGMENT"],"args":[{"name":"if","type":{"name":"Boolean","kind":"SCALAR"}}]},
+        \\{"name":"include","description":"Include field if true","locations":["FIELD","FRAGMENT_SPREAD","INLINE_FRAGMENT"],"args":[{"name":"if","type":{"name":"Boolean","kind":"SCALAR"}}]}
+        \\]}}}
+    ;
+
+    const graphql_welcome_response =
+        \\{"data":{"hello":"Welcome to GraphQL on api.zig! Visit /graphql/playground for the GraphQL Playground."}}
+    ;
+
+    // GraphQL Playground HTML (using GraphiQL 3.8.3)
+    const graphql_playground_html =
+        \\<!DOCTYPE html>
+        \\<html>
+        \\<head>
+        \\  <title>GraphQL Playground - api.zig</title>
+        \\  <meta charset="utf-8">
+        \\  <meta name="viewport" content="width=device-width, initial-scale=1">
+        \\  <link rel="stylesheet" href="/_assets/graphiql.min.css"/>
+        \\  <style>
+        \\    body { height: 100vh; margin: 0; overflow: hidden; background: #0b0c0e; font-family: system-ui, sans-serif; }
+        \\    #graphiql { height: 100vh; }
+        \\    .loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0b0c0e; z-index: 9999; color: white; transition: opacity 0.5s; }
+        \\    .loader.hide { opacity: 0; pointer-events: none; }
+        \\    .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top-color: #e10098; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        \\    @keyframes spin { to { transform: rotate(360deg); } }
+        \\  </style>
+        \\</head>
+        \\<body>
+        \\  <div class="loader" id="loader">
+        \\    <div class="spinner"></div>
+        \\    <div>Loading GraphQL Playground... 🚀</div>
+        \\  </div>
+        \\  <div id="graphiql"></div>
+        \\  <script src="/_assets/react.production.min.js"></script>
+        \\  <script src="/_assets/react-dom.production.min.js"></script>
+        \\  <script src="/_assets/graphiql.min.js"></script>
+        \\  <script>
+        \\    const root = ReactDOM.createRoot(document.getElementById('graphiql'));
+        \\    const fetcher = GraphiQL.createFetcher({
+        \\      url: window.location.origin + '/graphql',
+        \\      headers: { 'Content-Type': 'application/json' }
+        \\    });
+        \\    root.render(React.createElement(GraphiQL, {
+        \\      fetcher: fetcher,
+        \\      defaultEditorToolsVisibility: true
+        \\    }));
+        \\    setTimeout(() => document.getElementById('loader').classList.add('hide'), 500);
+        \\  </script>
         \\</body>
         \\</html>
     ;

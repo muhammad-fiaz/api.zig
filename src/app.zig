@@ -68,6 +68,7 @@ pub const RunConfig = struct {
     access_log: bool = true,
     num_threads: ?u8 = null,
     auto_port: bool = true,
+    disable_reserved_routes: bool = false,
 };
 
 /// Main application type.
@@ -255,6 +256,7 @@ pub const App = struct {
             .enable_access_log = config.access_log,
             .num_threads = thread_count,
             .auto_port = config.auto_port,
+            .disable_reserved_routes = config.disable_reserved_routes,
         });
         defer server.deinit();
 
@@ -274,7 +276,6 @@ pub const App = struct {
     pub fn setErrorHandler(self: *App, handler: *const fn (*Context, anyerror) Response) void {
         self.router.error_handler = handler;
     }
-
 
     /// Configures GraphQL support with the provided schema using comptime paths.
     /// Use this for static GraphQL configuration at compile time.
@@ -383,7 +384,7 @@ pub const App = struct {
                         .setStatus(.no_content)
                         .setHeader("Access-Control-Allow-Origin", "*")
                         .setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-                        .setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                        .setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, Origin, X-Requested-With, apollo-require-preflight")
                         .setHeader("Access-Control-Max-Age", "86400");
                 }
 
@@ -555,7 +556,6 @@ pub const App = struct {
         return self.graphql_schema;
     }
 
-
     /// Configures WebSocket support.
     pub fn enableWebSocket(self: *App, config: websocket.WebSocketConfig) !void {
         self.ws_hub = try self.allocator.create(websocket.Hub);
@@ -573,7 +573,6 @@ pub const App = struct {
     pub fn getWebSocketHub(self: *App) ?*websocket.Hub {
         return self.ws_hub;
     }
-
 
     /// Configures metrics collection and export.
     pub fn enableMetrics(self: *App, config: metrics.RegistryConfig) !void {
@@ -597,7 +596,6 @@ pub const App = struct {
     pub fn getMetricsRegistry(self: *App) ?*metrics.Registry {
         return self.metrics_registry;
     }
-
 
     /// Configures health check endpoints.
     pub fn enableHealthChecks(self: *App, config: metrics.HealthChecker.HealthConfig) !void {
@@ -625,7 +623,6 @@ pub const App = struct {
         }
     }
 
-
     /// Configures response caching.
     pub fn enableCaching(self: *App, config: cache.ResponseCache.ResponseCacheConfig) !void {
         self.response_cache = try self.allocator.create(cache.ResponseCache);
@@ -637,7 +634,6 @@ pub const App = struct {
     pub fn getCache(self: *App) ?*cache.ResponseCache {
         return self.response_cache;
     }
-
 
     /// Configures session management.
     pub fn enableSessions(self: *App, config: session.SessionConfig) !void {

@@ -300,7 +300,8 @@ pub const Response = struct {
         var resp = self;
         resp.headers.set("Access-Control-Allow-Origin", origin);
         resp.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-        resp.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        resp.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, Origin, X-Requested-With, apollo-require-preflight");
+        resp.headers.set("Access-Control-Allow-Credentials", "true");
         return resp;
     }
 

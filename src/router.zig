@@ -137,8 +137,16 @@ pub const Router = struct {
         self.routes.deinit(self.allocator);
     }
 
-    /// Add a compiled route.
+    /// Add a compiled route with duplicate detection.
     pub fn addRoute(self: *Router, r: Route) !void {
+        // Check for duplicate routes
+        for (self.routes.items) |existing| {
+            if (existing.method == r.method and std.mem.eql(u8, existing.path, r.path)) {
+                std.debug.print("\n[ERROR] Duplicate route detected: {s} {s}\n", .{ @tagName(r.method), r.path });
+                std.debug.print("        Each method+path combination must be unique.\n", .{});
+                return error.DuplicateRoute;
+            }
+        }
         try self.routes.append(self.allocator, r);
     }
 

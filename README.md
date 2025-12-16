@@ -171,12 +171,6 @@ api.Response.text("Created")
     .withCors("*");
 ```
 
-Run an example:
-
-```bash
-zig build run
-```
-
 ## 🧪 Testing
 
 Run the test suite:
