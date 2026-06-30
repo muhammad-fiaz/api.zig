@@ -1811,7 +1811,7 @@ pub fn graphqlPlayground(endpoint: []const u8) []const u8 {
 /// GraphQL Playground with full configuration - uses local assets (GraphiQL)
 pub fn graphqlPlaygroundWithConfig(config: GraphQLUIConfig) []const u8 {
     _ = config;
-    return 
+    return
     \\<!DOCTYPE html>
     \\<html>
     \\<head>
@@ -1863,7 +1863,7 @@ pub fn graphiql(endpoint: []const u8) []const u8 {
 /// GraphiQL with full configuration - uses local assets
 pub fn graphiqlWithConfig(config: GraphQLUIConfig) []const u8 {
     _ = config;
-    return 
+    return
     \\<!DOCTYPE html>
     \\<html>
     \\<head>
@@ -1912,7 +1912,7 @@ pub fn apolloSandbox(endpoint: []const u8) []const u8 {
 /// Apollo Sandbox with full configuration - uses local assets
 pub fn apolloSandboxWithConfig(config: GraphQLUIConfig) []const u8 {
     _ = config;
-    return 
+    return
     \\<!DOCTYPE html>
     \\<html>
     \\<head>
@@ -1959,7 +1959,7 @@ pub fn altairGraphQL(endpoint: []const u8) []const u8 {
 /// Altair GraphQL Client with full configuration - uses local assets
 pub fn altairGraphQLWithConfig(config: GraphQLUIConfig) []const u8 {
     _ = config;
-    return 
+    return
     \\<!DOCTYPE html>
     \\<html>
     \\<head>
@@ -2014,7 +2014,7 @@ pub fn graphqlVoyager(endpoint: []const u8) []const u8 {
 /// GraphQL Voyager with full configuration - uses local assets
 pub fn graphqlVoyagerWithConfig(config: GraphQLUIConfig) []const u8 {
     _ = config;
-    return 
+    return
     \\<!DOCTYPE html>
     \\<html>
     \\<head>
