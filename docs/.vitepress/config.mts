@@ -1,17 +1,65 @@
 import { defineConfig } from 'vitepress'
 
+const GA_ID = "G-6BVYCRK57P";
+const GTM_ID = "GTM-P4M9T8ZR";
+const ADSENSE_CLIENT_ID = "ca-pub-2040560600290490";
+
 export default defineConfig({
   title: "api.zig",
   description: "High-performance, multi-threaded HTTP API framework for Zig with GraphQL, WebSocket, and real-time support",
   base: '/api.zig/',
   ignoreDeadLinks: true,
   
+  sitemap: {
+    hostname: 'https://muhammad-fiaz.github.io',
+    changefreq: 'weekly',
+    priority: 0.8,
+    lastmod: new Date().toISOString(),
+    transformItems(items) {
+      return items.map(item => ({
+        ...item,
+        priority: item.url === '/api.zig/' ? 1.0 : 0.8,
+      }))
+    }
+  },
+
   head: [
     ['meta', { name: 'theme-color', content: '#f7a41d' }],
     ['meta', { name: 'og:type', content: 'website' }],
     ['meta', { name: 'og:site_name', content: 'api.zig' }],
     ['meta', { name: 'keywords', content: 'zig, api, graphql, websocket, http, framework, rest, openapi' }],
+    ['meta', { name: 'google-adsense-account', content: ADSENSE_CLIENT_ID }],
+
+    // Google Analytics
+    ['script', { async: true, src: `https://www.googletagmanager.com/gtag/js?id=${GA_ID}` }],
+    ['script', {}, `
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '${GA_ID}');
+    `],
+
+    // Google Tag Manager
+    ['script', {}, `
+      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+      j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+      'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+      })(window,document,'script','dataLayer','${GTM_ID}');
+    `],
+
+    // Google AdSense
+    ['script', { async: true, src: `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`, crossorigin: 'anonymous' }],
+
+    // Manifest
+    ['link', { rel: 'manifest', href: '/api.zig/manifest.json' }],
+    ['meta', { name: 'application-name', content: 'api.zig' }],
   ],
+
+  transformHtml(html) {
+    const gtmNoscript = `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`;
+    return html.replace('<body>', `<body>\n${gtmNoscript}`);
+  },
 
   themeConfig: {
     logo: '/logo.png',

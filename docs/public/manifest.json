@@ -1,0 +1,16 @@
+{
+  "name": "api.zig",
+  "short_name": "api.zig",
+  "description": "High-performance, multi-threaded HTTP API framework for Zig with GraphQL, WebSocket, and real-time support",
+  "start_url": "/api.zig/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f7a41d",
+  "icons": [
+    {
+      "src": "/api.zig/logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}
