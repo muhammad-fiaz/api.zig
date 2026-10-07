@@ -27,7 +27,9 @@
 
 ---
 
-> Note: This Project is in active development. Currently, Breaking changes may occur in every commit. Use at your own risk.
+> [!WARNING]
+> This project has been discontinued and replaced by [httpx.zig](https://github.com/muhammad-fiaz/httpx.zig).
+> Please use **httpx.zig** for new projects.
 
 ## ✨ Features
 
